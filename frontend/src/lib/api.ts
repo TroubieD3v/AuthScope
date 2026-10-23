@@ -2,7 +2,10 @@ export type Access = "public" | "authenticated" | "owner" | "tenant" | "roles";
 export type Verdict = "pass" | "violation" | "needs_review" | "inconclusive" | "skipped" | "error";
 export type Severity = "info" | "low" | "medium" | "high" | "critical";
 
-export interface AuthConfig { type: "bearer" | "header" | "cookie" | "none"; header_name: string; cookie_name: string }
+export interface AuthConfig {
+  type: "bearer" | "header" | "cookie" | "query" | "basic" | "none";
+  header_name: string; cookie_name: string; query_name: string; username: string | null;
+}
 export interface LoginConfig { method: string; path: string; body: Record<string, unknown>; token_path: string }
 export interface Identity {
   name: string; role: string; tenant: string | null; description?: string | null;
@@ -11,11 +14,14 @@ export interface Identity {
   has_secret?: boolean; secret_source?: "none" | "runtime" | "env" | "login" | "missing";
   password_source?: "runtime" | "env" | "missing" | null;
 }
-export interface Resource { type: string; id: string; owner: string | null; tenant: string | null; id_field: string; label?: string | null }
+export interface Resource {
+  type: string; id: string; owner: string | null; tenant: string | null; id_field: string; label?: string | null; parent?: string | null;
+}
 export interface RestrictedField { name: string; roles: string[]; owner_can_see: boolean }
 export interface Endpoint {
   method: string; path: string; summary?: string | null; tags: string[]; access: Access;
   allow_roles: string[]; resource_type: string | null; path_param: string | null; list_of: string | null;
+  param_types: Record<string, string>;
   restricted_fields: RestrictedField[]; params: Record<string, string>; query: Record<string, string>;
   body: unknown; enabled: boolean; source: "openapi" | "postman" | "manual"; inferred: boolean;
 }

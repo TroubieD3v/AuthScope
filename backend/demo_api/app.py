@@ -6,12 +6,13 @@ verified and its regression behaviour demonstrated.
 """
 from __future__ import annotations
 
+import base64
 import copy
 import os
 
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from .fixtures import PASSWORDS, TOKENS, active_vulns
@@ -64,25 +65,34 @@ def vulns() -> set[str]:
     return active_vulns()
 
 
-def _user_by_token(authorization: str | None):
-    if not authorization or not authorization.lower().startswith("bearer "):
+def _user_by_credentials(authorization: str | None, api_key: str | None):
+    """Bearer token, HTTP Basic (username + demo password) or ?api_key=<token>."""
+    token = api_key
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    elif authorization and authorization.lower().startswith("basic "):
+        try:
+            user, _, password = base64.b64decode(authorization[6:].strip()).decode().partition(":")
+        except ValueError:
+            return None
+        return USERS.get(NAME_TO_ID[user]) if PASSWORDS.get(user) == password else None
+    if not token:
         return None
-    token = authorization[7:].strip()
     for name, value in TOKENS.items():
         if token == value:
             return USERS.get(NAME_TO_ID[name])
     return None
 
 
-def current_user(authorization: str | None = Header(default=None)):
-    user = _user_by_token(authorization)
+def current_user(authorization: str | None = Header(default=None), api_key: str | None = Query(default=None)):
+    user = _user_by_credentials(authorization, api_key)
     if not user:
         raise HTTPException(401, "Authentication required")
     return user
 
 
-def maybe_user(authorization: str | None = Header(default=None)):
-    return _user_by_token(authorization)
+def maybe_user(authorization: str | None = Header(default=None), api_key: str | None = Query(default=None)):
+    return _user_by_credentials(authorization, api_key)
 
 
 def public_user(user: dict, viewer: dict) -> dict:
@@ -192,6 +202,20 @@ def update_order(order_id: int, body: dict[str, Any] = Body(..., examples=[{"sta
     if not order or not can_read_order(order, user):
         raise HTTPException(404, "Order not found")
     _apply(order, body, {"status", "total"} if user["role"] == "admin" else {"status"})
+    return order_view(order)
+
+
+@app.get("/api/users/{user_id}/orders/{order_id}", tags=["orders"], summary="Get one of a user's orders",
+         openapi_extra=BEARER)
+def user_order(user_id: int, order_id: int, user=Depends(current_user)):
+    """Nested route. Vulnerable: only checks that the order belongs to {user_id}, not that the caller is that user."""
+    order = ORDERS.get(order_id)
+    if not order or order["ownerId"] != user_id:
+        raise HTTPException(404, "Order not found")
+    if user["role"] != "admin" and user["id"] != user_id:
+        same_tenant = order["tenant"] == user["tenant"]
+        if not ("bola" in vulns() and same_tenant or "tenant" in vulns() and not same_tenant):
+            raise HTTPException(404, "Order not found")
     return order_view(order)
 
 

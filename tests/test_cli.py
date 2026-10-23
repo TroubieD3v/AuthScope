@@ -10,7 +10,7 @@ EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "demo.authscope.yam
 
 def test_example_config_is_valid_and_matches_demo_builder():
     cfg = ProjectConfig.model_validate(yaml.safe_load(EXAMPLE.read_text(encoding="utf-8")))
-    assert len(cfg.endpoints) == 12 and {i.name for i in cfg.identities} == {"guest", "alice", "bob", "carol", "admin"}
+    assert len(cfg.endpoints) == 13 and {i.name for i in cfg.identities} == {"guest", "alice", "bob", "carol", "admin"}
     assert cfg.identity("alice").token_env == "AUTHSCOPE_TOKEN_ALICE"
     assert cfg.identity("carol").login and cfg.identity("carol").password_env == "AUTHSCOPE_PASSWORD_CAROL"
 

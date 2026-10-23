@@ -146,10 +146,7 @@ class TestRunner:
 
     def _request_parts(self, case: Case):
         ep = case.endpoint
-        params = dict(ep.params)
-        if case.resource and ep.bound_param:
-            params[ep.bound_param] = case.resource.id
-        path = render_path(ep.path, params)
+        path = render_path(ep.path, self.cfg.path_values(ep, case.resource))
         body = case.body if case.body is not None else ep.body
         return ep.method, path, (ep.query or None), (body if ep.mutating else None)
 
@@ -268,7 +265,7 @@ class TestRunner:
             baseline=baseline.exchange(self.masker) if baseline else None,
             test=test.exchange(self.masker), diff=diff,
             expected=f"{case.expected} for '{who}' - {case.reason}" if case.expected else "",
-            observed=f"{j.observed}: {j.message}", reproduction=repro,
+            observed=f"{j.observed}: {j.message}", reproduction=[self.masker.text(r) for r in repro],
             regression=self._regression(case),
         )
 

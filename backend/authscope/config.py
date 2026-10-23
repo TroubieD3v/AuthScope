@@ -86,9 +86,18 @@ def _is_loopback(host: str) -> bool:
 
 
 class AuthConfig(BaseModel):
-    type: Literal["bearer", "header", "cookie", "none"] = "bearer"
+    """How the identity's secret is attached to requests.
+
+    bearer: ``Authorization: Bearer <secret>``; header: ``<header_name>: <secret>``;
+    cookie: ``<cookie_name>=<secret>``; query: ``?<query_name>=<secret>``;
+    basic: HTTP Basic with ``username`` + secret as password (or a ``user:password`` secret).
+    """
+
+    type: Literal["bearer", "header", "cookie", "query", "basic", "none"] = "bearer"
     header_name: str = "X-API-Key"  # type == header
     cookie_name: str = "session"  # type == cookie
+    query_name: str = "api_key"  # type == query
+    username: str | None = None  # type == basic
 
 
 class LoginConfig(BaseModel):
@@ -151,6 +160,7 @@ class Resource(BaseModel):
     tenant: str | None = None
     id_field: str = "id"
     label: str | None = None
+    parent: str | None = None  # "user:1" - fills the parent segment of nested paths
 
     @field_validator("id", mode="before")
     @classmethod
@@ -179,6 +189,7 @@ class Endpoint(BaseModel):
     allow_roles: list[str] = Field(default_factory=list)
     resource_type: str | None = None
     path_param: str | None = None
+    param_types: dict[str, str] = Field(default_factory=dict)  # nested paths: {"user_id": "user"}
     list_of: str | None = None
     restricted_fields: list[RestrictedField] = Field(default_factory=list)
     params: dict[str, str] = Field(default_factory=dict)
@@ -217,10 +228,22 @@ class Endpoint(BaseModel):
 
     @property
     def bound_param(self) -> str | None:
+        """The path parameter that carries the tested object's id."""
         if self.path_param:
             return self.path_param
         params = [p for p in self.path_params if p not in self.params]
-        return params[0] if len(params) == 1 else None
+        if len(params) == 1:
+            return params[0]
+        if params and self.resource_type:
+            typed = [p for p in params if self.param_type(p) == self.resource_type]
+            return typed[-1] if typed else params[-1]
+        return None
+
+    def param_type(self, param: str) -> str | None:
+        if param in self.param_types:
+            return self.param_types[param]
+        base = re.sub(r"(_id|Id|_uuid|Uuid|_ID)$", "", param)
+        return base.lower() if base and base != param else None
 
 
 class Override(BaseModel):
@@ -297,6 +320,33 @@ class ProjectConfig(BaseModel):
             return res.tenant
         owner = self.identity(res.owner) if res.owner else None
         return owner.tenant if owner else None
+
+    def path_values(self, ep: Endpoint, res: Resource | None) -> dict[str, str]:
+        """Values for every path parameter: fixed params, the object id, and parent objects.
+
+        Other parameters are filled from the object's ``parent`` chain, then from an object of the
+        parameter's type owned by the same identity. Unresolvable parameters are left out.
+        """
+        values = dict(ep.params)
+        bound = ep.bound_param
+        if res is not None and bound:
+            values[bound] = res.id
+        chain: list[Resource] = []
+        cur = res
+        while cur is not None and cur.parent and len(chain) < 5:
+            cur = self.resource(cur.parent)
+            if cur is not None:
+                chain.append(cur)
+        for p in ep.path_params:
+            if p in values:
+                continue
+            ptype = ep.param_type(p)
+            match = next((c for c in chain if c.type == ptype), None)
+            if match is None and res is not None and ptype:
+                match = next((r for r in self.resources_of(ptype) if r.owner and r.owner == res.owner), None)
+            if match is not None:
+                values[p] = match.id
+        return values
 
     def endpoint(self, key: str) -> Endpoint | None:
         return next((e for e in self.endpoints if e.key == key), None)

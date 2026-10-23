@@ -86,7 +86,10 @@ def cmd_demo_config(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from . import __version__
+
     p = argparse.ArgumentParser(prog="authscope", description="API authorization testing")
+    p.add_argument("--version", action="version", version=f"authscope {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     r = sub.add_parser("run", help="run checks from a YAML config (tokens come from environment variables)")

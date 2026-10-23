@@ -1,0 +1,44 @@
+name: Bug report
+description: AuthScope reports something wrong, misses a real issue, or crashes
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problem in AuthScope itself (secret leak, request outside `allowed_hosts`)? Please use
+        [private vulnerability reporting](../security/advisories/new) instead of a public issue.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Test engine / modules, Comparison / verdicts, Import (OpenAPI / Postman), Web UI, CLI, Reports, Docker, Other]
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the verdict you got and the one you expected (false positive / false negative / crash).
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Minimal config (YAML) and steps. Remove tokens, passwords and private hosts.
+      render: yaml
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence / logs
+      description: Masked request/response pair from the report, or the error output.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "1.1.0 (authscope --version or /api/health)"
+    validations: { required: true }
+  - type: dropdown
+    id: run
+    attributes:
+      label: How do you run it
+      options: [Docker Compose, pip install / authscope serve, CLI only]

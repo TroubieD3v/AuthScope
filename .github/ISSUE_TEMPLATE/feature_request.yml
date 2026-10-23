@@ -1,0 +1,21 @@
+name: Feature request
+description: A new check, import format, report option or UI improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Which authorization flaw or workflow is not covered today?
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How should AuthScope detect it or behave? What would a finding look like?
+    validations: { required: true }
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety considerations
+      description: Does it send state-changing requests or need new safety limits? (See the Safety model in the README.)

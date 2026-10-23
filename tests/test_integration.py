@@ -133,6 +133,33 @@ async def test_failed_login_is_reported(demo_url):
     assert any("login for 'carol' failed: HTTP 401" in w for w in runner.warnings)
 
 
+async def test_query_and_basic_auth_identities(demo_url, monkeypatch):
+    from authscope.http_engine import SecretStore
+    from demo_api.fixtures import PASSWORDS, TOKENS
+
+    monkeypatch.delenv("DEMO_VULNS", raising=False)
+    cfg = demo_config(demo_url)
+    cfg.identity("alice").auth = cfg.identity("alice").auth.model_copy(update={"type": "query", "query_name": "api_key"})
+    cfg.identity("bob").auth = cfg.identity("bob").auth.model_copy(update={"type": "basic", "username": "bob"})
+    store = SecretStore()
+    store.set("p", "alice", TOKENS["alice"])
+    store.set("p", "bob", PASSWORDS["bob"])
+    store.set("p", "admin", TOKENS["admin"])
+    results = await TestRunner(cfg, store, "p", ["bola"]).run()
+
+    bad = {(r.identity, r.endpoint_key, r.resource) for r in results if r.verdict == "violation"}
+    assert ("bob", "GET /api/orders/{order_id}", "order:101") in bad
+    assert ("bob", "GET /api/users/{user_id}/orders/{order_id}", "order:101") in bad  # nested route
+    owner = pick(results, identity="alice", endpoint_key="GET /api/orders/{order_id}", resource="order:101")[0]
+    assert owner.verdict == "pass"
+    blob = json.dumps([r.model_dump() for r in results])
+    assert TOKENS["alice"] not in blob and PASSWORDS["bob"] not in blob
+    nested = pick(results, identity="bob", endpoint_key="GET /api/users/{user_id}/orders/{order_id}", resource="order:101")[0]
+    assert nested.evidence.test.url.endswith("/api/users/1/orders/101")
+    assert '-u "bob:$AUTHSCOPE_TOKEN_BOB"' in nested.evidence.reproduction[-1]
+    assert "api_key=$AUTHSCOPE_TOKEN_ALICE" in nested.evidence.reproduction[0]
+
+
 async def test_rate_limit_and_budget(demo_url, demo_secrets):
     cfg = demo_config(demo_url)
     cfg.target.max_requests = 5
@@ -193,7 +220,7 @@ def test_api_workflow_reports_matrix_and_regression_diff(demo_url, monkeypatch):
         assert len(diff["fixed"]) > 10 and diff["new"] == [] and diff["unchanged"] == []
 
         dash = client.get(f"/api/projects/{pid}/dashboard").json()
-        assert dash["endpoints"] == 12 and dash["latest_run"]["id"] == r2["id"] and len(dash["history"]) == 2
+        assert dash["endpoints"] == 13 and dash["latest_run"]["id"] == r2["id"] and len(dash["history"]) == 2
 
 
 def test_api_import_openapi_from_allowed_url_only(demo_url):

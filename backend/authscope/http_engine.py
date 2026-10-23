@@ -1,6 +1,7 @@
 """Async HTTP engine. Every request passes the guard, rate limiter and request budget."""
 from __future__ import annotations
 
+import base64
 import json
 import os
 import time
@@ -134,7 +135,7 @@ class Requester:
         self._resolve = resolve_secret
         self._client = httpx.AsyncClient(
             timeout=target.timeout_s, follow_redirects=False, verify=target.verify_tls,
-            trust_env=False, headers={"User-Agent": "AuthScope/1.0 (authorization tester)"},
+            trust_env=False, headers={"User-Agent": "AuthScope/1.1 (authorization tester)"},
         )
 
     async def aclose(self) -> None:
@@ -142,7 +143,14 @@ class Requester:
 
     def secret_values(self, identities: list[Identity]) -> dict[str, str]:
         """Every credential value that must be masked in evidence."""
-        return {i.name: tok for i in identities if (tok := self._resolve(i))}
+        out: dict[str, str] = {}
+        for i in identities:
+            if tok := self._resolve(i):
+                out[i.name] = tok
+                if i.auth.type == "basic":
+                    pair = f"{i.auth.username}:{tok}" if i.auth.username else tok
+                    out[f"{i.name}:basic"] = base64.b64encode(pair.encode()).decode()
+        return out
 
     def token_for(self, identity: Identity | None, mode: str) -> str | None:
         if mode == "invalid":
@@ -151,20 +159,28 @@ class Requester:
             return None
         return self._resolve(identity)
 
-    def _auth(self, identity: Identity | None, mode: str) -> tuple[dict[str, str], dict[str, str]]:
+    def _auth(self, identity: Identity | None, mode: str) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+        """Headers, cookies and query parameters that carry the credential."""
         headers: dict[str, str] = {}
         cookies: dict[str, str] = {}
+        params: dict[str, str] = {}
         token = self.token_for(identity, mode)
         if not token:
-            return headers, cookies
-        kind = identity.auth.type if identity and mode != "invalid" else "bearer"
+            return headers, cookies, params
+        auth = identity.auth if identity and mode != "invalid" else None
+        kind = auth.type if auth else "bearer"
         if kind == "bearer":
             headers["Authorization"] = f"Bearer {token}"
         elif kind == "header":
-            headers[identity.auth.header_name] = token  # type: ignore[union-attr]
+            headers[auth.header_name] = token  # type: ignore[union-attr]
         elif kind == "cookie":
-            cookies[identity.auth.cookie_name] = token  # type: ignore[union-attr]
-        return headers, cookies
+            cookies[auth.cookie_name] = token  # type: ignore[union-attr]
+        elif kind == "query":
+            params[auth.query_name] = token  # type: ignore[union-attr]
+        elif kind == "basic":
+            pair = f"{auth.username}:{token}" if auth.username else token  # type: ignore[union-attr]
+            headers["Authorization"] = "Basic " + base64.b64encode(pair.encode()).decode()
+        return headers, cookies, params
 
     async def send(
         self, method: str, path: str, *, identity: Identity | None = None, mode: str = "identity",
@@ -184,7 +200,9 @@ class Requester:
         self.budget.consume()
         await self.limiter.acquire()
 
-        headers, cookies = self._auth(identity, mode)
+        headers, cookies, auth_params = self._auth(identity, mode)
+        if auth_params:
+            query = {**(query or {}), **auth_params}
         content = None
         if body is not None:
             content = json.dumps(body)

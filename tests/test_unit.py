@@ -204,3 +204,57 @@ def test_postman_parser_rejects_other_json():
 
     with pytest.raises(ImportErrorInfo):
         parse_collection('{"openapi": "3.0.0", "paths": {}}')
+
+
+# -- auth formats / nested paths ------------------------------------------------------------
+def _ident(**auth):
+    from authscope.config import Identity
+
+    return Identity(name="alice", auth=auth)
+
+
+def test_query_and_basic_auth_are_applied():
+    import base64
+
+    from authscope.http_engine import Requester
+
+    r = Requester(TargetConfig(base_url="http://127.0.0.1:8000"), lambda i: "s3cret-value")
+    assert r._auth(_ident(type="query", query_name="key"), "identity") == ({}, {}, {"key": "s3cret-value"})
+    h, _, _ = r._auth(_ident(type="basic", username="alice"), "identity")
+    assert base64.b64decode(h["Authorization"][6:]) == b"alice:s3cret-value"
+    h, _, _ = r._auth(_ident(type="bearer"), "invalid")
+    assert h["Authorization"] == "Bearer authscope-invalid-token"
+    assert "alice:basic" in r.secret_values([_ident(type="basic", username="alice")])
+
+
+def test_curl_uses_placeholders_for_query_and_basic():
+    from authscope.evidence import curl_command
+
+    raw = RawResponse(method="GET", url="http://h/x?page=2&key=s3cret-value", label="t", identity="alice",
+                      request_headers={}, request_body=None)
+    cmd = curl_command(raw, _ident(type="query", query_name="key"), "identity")
+    assert "s3cret-value" not in cmd and "key=$AUTHSCOPE_TOKEN_ALICE" in cmd and "page=2" in cmd
+    cmd = curl_command(raw, _ident(type="basic", username="alice"), "identity")
+    assert '-u "alice:$AUTHSCOPE_TOKEN_ALICE"' in cmd
+
+
+def test_nested_path_values_use_parent_then_owner():
+    c = ProjectConfig.model_validate({
+        "target": {"base_url": "http://127.0.0.1:8000"},
+        "identities": ["alice"],
+        "resources": [{"type": "user", "id": 1, "owner": "alice"}, {"type": "shop", "id": 7, "owner": "alice"},
+                      {"type": "order", "id": 101, "owner": "alice", "parent": "user:1"}],
+        "endpoints": [{"method": "GET", "path": "/users/{user_id}/shops/{shop_id}/orders/{order_id}",
+                       "access": "owner", "resource_type": "order"}],
+    })
+    ep = c.endpoints[0]
+    assert ep.bound_param == "order_id"
+    assert c.path_values(ep, c.resource("order:101")) == {"order_id": "101", "user_id": "1", "shop_id": "7"}
+
+
+def test_openapi_nested_paths_get_param_types():
+    from authscope.openapi_import import infer_rules
+
+    r = infer_rules("get", "/users/{user_id}/orders/{order_id}", False)
+    assert r["resource_type"] == "order" and r["param_types"] == {"user_id": "user", "order_id": "order"}
+    assert r["access"] == "owner"

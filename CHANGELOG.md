@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0
+
+- Authentication: API key in a query parameter (`auth.type: query`) and HTTP Basic (`auth.type: basic`,
+  with `username` + password secret, or a `user:password` secret). Reproduction commands and pytest exports use
+  environment-variable placeholders for both.
+- Nested object paths such as `/users/{user_id}/orders/{order_id}`: the object id goes into the last typed parameter,
+  parents are filled from the resource's `parent` chain or from an object of the same owner. Importers infer
+  `param_types`.
+- Demo API: nested order route, Basic and `?api_key=` authentication.
+- README with screenshots and demo GIF (regenerate with `scripts/screenshots.py`), Russian README,
+  architecture and threat-model docs, issue and pull request templates, `authscope --version`.
+
 ## 1.0.0
 
 First public release.

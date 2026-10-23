@@ -18,7 +18,7 @@ target:
 identities:
   - { name: guest, role: guest }                     # no credentials
   - { name: alice, role: user, tenant: acme }
-  - { name: bob,   role: user, tenant: acme }
+  - { name: bob,   role: user, tenant: acme }         # any identity can also use auth: {type: query|basic|header|cookie}
   - name: carol
     role: user
     tenant: globex
@@ -33,9 +33,9 @@ resources:                                           # who owns which test objec
   - { type: user,    id: 2,   owner: bob }
   - { type: user,    id: 3,   owner: carol }
   - { type: user,    id: 4,   owner: admin }
-  - { type: order,   id: 101, owner: alice }
-  - { type: order,   id: 102, owner: bob }
-  - { type: order,   id: 103, owner: carol }
+  - { type: order,   id: 101, owner: alice, parent: "user:1" }   # parent fills {user_id} in nested paths
+  - { type: order,   id: 102, owner: bob,   parent: "user:2" }
+  - { type: order,   id: 103, owner: carol, parent: "user:3" }
   - { type: invoice, id: 201, owner: alice, tenant: acme }
   - { type: invoice, id: 202, owner: carol, tenant: globex }
 
@@ -56,6 +56,7 @@ endpoints:
   - { method: GET, path: "/api/orders/{order_id}", access: owner, allow_roles: [admin], resource_type: order }
   - { method: PUT, path: "/api/orders/{order_id}", access: owner, allow_roles: [admin], resource_type: order,
       body: { status: tampered } }
+  - { method: GET, path: "/api/users/{user_id}/orders/{order_id}", access: owner, allow_roles: [admin], resource_type: order }
   - { method: GET, path: "/api/orders/{order_id}/items", access: owner, allow_roles: [admin], resource_type: order }
   - { method: GET, path: "/api/invoices/{invoice_id}", access: tenant, allow_roles: [admin], resource_type: invoice }
   - { method: GET, path: /api/admin/stats, access: roles, allow_roles: [admin] }

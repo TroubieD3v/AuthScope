@@ -122,7 +122,7 @@ export function Explorer() {
 
 const blank = (method: string, path: string): Endpoint => ({
   method, path, summary: null, tags: [], access: "authenticated", allow_roles: [], resource_type: null, path_param: null,
-  list_of: null, restricted_fields: [], params: {}, query: {}, body: null, enabled: true, source: "manual", inferred: false,
+  list_of: null, param_types: {}, restricted_fields: [], params: {}, query: {}, body: null, enabled: true, source: "manual", inferred: false,
 });
 
 function EndpointEditor({ ep, onDone }: { ep: Endpoint; onDone: () => void }) {
@@ -157,6 +157,11 @@ function EndpointEditor({ ep, onDone }: { ep: Endpoint; onDone: () => void }) {
       <Field label="Lists objects of type" hint="For collection endpoints - checked for leaks">
         <Input value={d.list_of ?? ""} onChange={(e) => setD({ ...d, list_of: e.target.value || null })} />
       </Field>
+      {ep.path.split("{").length > 2 && (
+        <Field label="Path parameter types (nested paths, JSON)" hint='Which object type each parameter refers to, e.g. {"user_id":"user","order_id":"order"}' className="col-span-3">
+          <Input className="font-mono text-xs" defaultValue={JSON.stringify(d.param_types)} onChange={(e) => { try { setD({ ...d, param_types: JSON.parse(e.target.value || "{}") }); } catch { /* typing */ } }} />
+        </Field>
+      )}
       <Field label="Fixed path params (JSON)" hint='Values for params that are not resources, e.g. {"version":"v1"}'>
         <Input className="font-mono text-xs" value={JSON.stringify(d.params)} onChange={(e) => { try { setD({ ...d, params: JSON.parse(e.target.value || "{}") }); } catch { /* typing */ } }} />
       </Field>

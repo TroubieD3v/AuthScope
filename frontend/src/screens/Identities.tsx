@@ -20,15 +20,18 @@ export function Identities() {
   const { project, reload } = useApp();
   const act = useAction();
   const [tokens, setTokens] = useState<Record<string, string>>({});
-  const [ni, setNi] = useState({ name: "", role: "user", tenant: "", authType: "bearer", header: "X-API-Key", loginPath: "", tokenPath: "access_token" });
+  const [ni, setNi] = useState({ name: "", role: "user", tenant: "", authType: "bearer", header: "X-API-Key", queryName: "api_key", username: "", loginPath: "", tokenPath: "access_token" });
   const [passwords, setPasswords] = useState<Record<string, string>>({});
-  const [nr, setNr] = useState({ type: "order", id: "", owner: "", tenant: "" });
+  const [nr, setNr] = useState({ type: "order", id: "", owner: "", tenant: "", parent: "" });
 
   const addIdentity = () => act(async () => {
     const anon = ni.authType === "none";
     await api.putIdentity(project.id, {
       name: ni.name.trim(), role: anon ? "guest" : ni.role, tenant: ni.tenant || null,
-      auth: { type: ni.authType as Identity["auth"]["type"], header_name: ni.header, cookie_name: "session" },
+      auth: {
+        type: ni.authType as Identity["auth"]["type"], header_name: ni.header, cookie_name: "session",
+        query_name: ni.queryName || "api_key", username: ni.authType === "basic" && ni.username ? ni.username : null,
+      },
       login: !anon && ni.loginPath.trim()
         ? { method: "POST", path: ni.loginPath.trim(), body: { username: ni.name.trim(), password: "${password}" }, token_path: ni.tokenPath || "access_token" }
         : null,
@@ -66,7 +69,7 @@ export function Identities() {
                 <div className="flex flex-1 items-center gap-2">
                   {i.auth.type !== "none" && (
                     <>
-                      <Input type="password" autoComplete="off" placeholder={`${i.auth.type} token`} className="max-w-xs font-mono"
+                      <Input type="password" autoComplete="off" placeholder={i.auth.type === "basic" ? (i.auth.username ? `password of ${i.auth.username}` : "user:password") : i.auth.type === "query" ? `?${i.auth.query_name}= value` : `${i.auth.type} token`} className="max-w-xs font-mono"
                         value={tokens[i.name] ?? ""} onChange={(e) => setTokens({ ...tokens, [i.name]: e.target.value })} />
                       <Button size="sm" variant="secondary" disabled={!tokens[i.name]} onClick={() => act(async () => {
                         await api.setSecret(project.id, i.name, tokens[i.name]); setTokens({ ...tokens, [i.name]: "" }); await reload();
@@ -94,8 +97,15 @@ export function Identities() {
           <Field label="Role"><Input value={ni.role} disabled={ni.authType === "none"} onChange={(e) => setNi({ ...ni, role: e.target.value })} placeholder="user | admin" /></Field>
           <Field label="Tenant (optional)"><Input value={ni.tenant} onChange={(e) => setNi({ ...ni, tenant: e.target.value })} placeholder="acme" /></Field>
           <Field label="Authentication"><Select value={ni.authType} onChange={(e) => setNi({ ...ni, authType: e.target.value })}>
-            <option value="bearer">Bearer token</option><option value="header">Custom header</option><option value="cookie">Session cookie</option><option value="none">None (guest)</option></Select></Field>
-          <Field label="Header name"><Input value={ni.header} disabled={ni.authType !== "header"} onChange={(e) => setNi({ ...ni, header: e.target.value })} /></Field>
+            <option value="bearer">Bearer token</option><option value="header">Custom header</option><option value="cookie">Session cookie</option>
+            <option value="query">API key in query</option><option value="basic">HTTP Basic</option><option value="none">None (guest)</option></Select></Field>
+          {ni.authType === "query" ? (
+            <Field label="Query parameter"><Input value={ni.queryName} onChange={(e) => setNi({ ...ni, queryName: e.target.value })} /></Field>
+          ) : ni.authType === "basic" ? (
+            <Field label="Username" hint="secret = password; empty: secret is user:password"><Input value={ni.username} onChange={(e) => setNi({ ...ni, username: e.target.value })} /></Field>
+          ) : (
+            <Field label="Header name"><Input value={ni.header} disabled={ni.authType !== "header"} onChange={(e) => setNi({ ...ni, header: e.target.value })} /></Field>
+          )}
           <Button variant="secondary" disabled={!ni.name.trim()} onClick={addIdentity}><Plus className="size-4" /> Add</Button>
           <Field label="Login endpoint (optional)" hint='POST {"username": name, "password": ...}; the token is taken from the JSON response' className="col-span-3">
             <Input className="font-mono" value={ni.loginPath} disabled={ni.authType === "none"} onChange={(e) => setNi({ ...ni, loginPath: e.target.value })} placeholder="/api/auth/login" />
@@ -110,7 +120,7 @@ export function Identities() {
         <CardHeader title="Test objects and their owners" hint="BOLA tests compare the owner's request against other identities requesting the same object." />
         <table className="w-full text-left text-sm">
           <thead className="text-xs text-mute"><tr>
-            <th className="px-5 py-2 font-medium">Type</th><th className="font-medium">Object id</th><th className="font-medium">Owner</th><th className="font-medium">Tenant</th><th />
+            <th className="px-5 py-2 font-medium">Type</th><th className="font-medium">Object id</th><th className="font-medium">Owner</th><th className="font-medium">Tenant</th><th className="font-medium">Parent</th><th />
           </tr></thead>
           <tbody>
             {project.resources.map((r, idx) => (
@@ -119,19 +129,21 @@ export function Identities() {
                 <td className="font-mono">{r.id}</td>
                 <td>{r.owner ?? <span className="text-warn">no owner</span>}</td>
                 <td className="font-mono text-mute">{r.tenant ?? "(from owner)"}</td>
+                <td className="font-mono text-mute">{r.parent ?? "-"}</td>
                 <td className="pr-4 text-right"><Button size="icon" variant="ghost" onClick={() => saveResources(project.resources.filter((_, j) => j !== idx))}><Trash2 className="size-4" /></Button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div className="grid grid-cols-5 items-end gap-2 border-t border-line p-4">
+        <div className="grid grid-cols-6 items-end gap-2 border-t border-line p-4">
           <Field label="Type"><Input value={nr.type} onChange={(e) => setNr({ ...nr, type: e.target.value })} /></Field>
           <Field label="Object id"><Input value={nr.id} onChange={(e) => setNr({ ...nr, id: e.target.value })} placeholder="101" /></Field>
           <Field label="Owner"><Select value={nr.owner} onChange={(e) => setNr({ ...nr, owner: e.target.value })}>
             <option value="">-</option>{owners.map((o) => <option key={o.name}>{o.name}</option>)}</Select></Field>
           <Field label="Tenant (optional)"><Input value={nr.tenant} onChange={(e) => setNr({ ...nr, tenant: e.target.value })} /></Field>
+          <Field label="Parent (nested paths)" hint="e.g. user:1"><Input value={nr.parent} onChange={(e) => setNr({ ...nr, parent: e.target.value })} placeholder="user:1" /></Field>
           <Button variant="secondary" disabled={!nr.type || !nr.id} onClick={() => {
-            saveResources([...project.resources, { type: nr.type, id: nr.id, owner: nr.owner || null, tenant: nr.tenant || null, id_field: "id" }]);
+            saveResources([...project.resources, { type: nr.type, id: nr.id, owner: nr.owner || null, tenant: nr.tenant || null, id_field: "id", parent: nr.parent || null }]);
             setNr({ ...nr, id: "" });
           }}><Plus className="size-4" /> Add object</Button>
         </div>

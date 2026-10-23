@@ -45,7 +45,7 @@ def test_demo_workflow_in_browser(app_url, demo_url, page, monkeypatch):
     page.get_by_role("button", name="Test Runner").click()
     page.get_by_role("button", name="Start run (6)").click()
     page.get_by_role("button", name="Open findings").wait_for(timeout=30_000)
-    assert "32 violations" in page.text_content("main")
+    assert "38 violations" in page.text_content("main")
 
     page.get_by_role("button", name="Permission Matrix").click()
     page.get_by_text("VIOLATION").first.wait_for()

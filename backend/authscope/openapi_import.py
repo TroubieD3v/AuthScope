@@ -114,7 +114,8 @@ def infer_rules(method: str, path: str, public: bool) -> dict[str, Any]:
     method = method.lower()
     path_params = re.findall(r"{([^}/]+)}", path)
     access, allow_roles = ("public" if public else "authenticated"), []
-    rtype = _resource_type_for(path, path_params[0]) if len(path_params) == 1 else None
+    rtype = _resource_type_for(path, path_params[-1]) if path_params else None
+    param_types = {p: _resource_type_for(path, p) for p in path_params} if len(path_params) > 1 else {}
     list_of = None
     segments = [s for s in path.split("/") if s]
     if re.search(r"(^|/)(admin|internal|management|backoffice)(/|$)", path, re.I):
@@ -123,7 +124,8 @@ def infer_rules(method: str, path: str, public: bool) -> dict[str, Any]:
         access, allow_roles = "owner", ["admin"]
     if method == "get" and not path_params and segments and segments[-1].endswith("s"):
         list_of = _singular(segments[-1]).lower()
-    return {"access": access, "allow_roles": allow_roles, "resource_type": rtype, "list_of": list_of}
+    return {"access": access, "allow_roles": allow_roles, "resource_type": rtype, "list_of": list_of,
+            "param_types": param_types}
 
 
 def endpoints_from_openapi(doc: dict[str, Any]) -> list[Endpoint]:

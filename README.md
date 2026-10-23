@@ -1,188 +1,202 @@
-# AuthScope
+# AuthScope: API Authorization Testing Platform
 
-**API authorization testing platform** - finds BOLA/IDOR, BFLA, BOPLA, unauthenticated access and
-cross-tenant leaks in REST APIs by comparing what the API *actually does* with the access policy you
-describe.
+[![CI](https://github.com/TroubieD3v/APIAuthorizationTester/actions/workflows/ci.yml/badge.svg)](https://github.com/TroubieD3v/APIAuthorizationTester/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-a2a6ae)](LICENSE)
+![OWASP API Security Top 10:2023](https://img.shields.io/badge/OWASP%20API%20Top%2010-2023-e8a33d)
+![Modules](https://img.shields.io/badge/modules-5-2dd4bf)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-7cc4e8)
+![Docker Compose](https://img.shields.io/badge/run%20with-Docker%20Compose-a2a6ae)
 
-AuthScope does not look for "HTTP 200". It answers: *"Bob got access to Alice's order 101, contrary to the
-configured policy - here is reproducible evidence."*
+**English** · [Русский](README.ru.md)
 
-> For **authorized** testing only: your own APIs, staging environments, pentests with a written scope.
-> The engine contacts nothing but the hosts you list (see [Safety model](#safety-model)).
+AuthScope is an open-source tool for finding **authorization bugs in REST APIs**: BOLA/IDOR, BFLA, Broken Object
+Property Level Authorization, missing authentication and cross-tenant leaks. You connect your API, import
+OpenAPI or a Postman collection, add a few test accounts and say who owns which objects. AuthScope then checks
+who can **actually** reach which data and functions, and compares that with the access policy you expect.
 
-## Quick start
+It does not stop at "the API returned 200". It reports *"Bob got access to Alice's order 101, contrary to the
+configured policy"* with both requests, the response differences, the expected rule and a command to reproduce it.
+
+> **Warning**: test only APIs you own or are authorized to test. The engine contacts nothing but the hosts you list,
+> is read-only by default and rate-limited. The bundled `demo_api` is vulnerable on purpose; never expose it.
+> See [SECURITY.md](SECURITY.md) and the [threat model](docs/threat-model.md).
+
+![Run the checks, read the matrix, open the evidence](docs/screenshots/demo.gif)
+
+*A run against the demo API: the matrix shows where real behaviour breaks the expected policy, and every finding
+opens with both requests side by side.*
+
+![Permission matrix](docs/screenshots/matrix.png)
+
+| Evidence for a finding | Dashboard |
+|---|---|
+| ![Findings & Reports](docs/screenshots/findings.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+
+## Checks
+
+Five modules covering the authorization categories of the
+[OWASP API Security Top 10:2023](https://owasp.org/API-Security/editions/2023/en/0x11-t10/).
+
+| Module | Finds | OWASP API Top 10:2023 |
+|---|---|---|
+| BOLA / IDOR | User B reads User A's object; list endpoints that return other users' objects | API1 Broken Object Level Authorization |
+| BFLA | Regular users calling admin functions | API5 Broken Function Level Authorization |
+| BOPLA | Responses exposing properties a role must not see, e.g. `internalNotes` | API3 Broken Object Property Level Authorization |
+| Unauthenticated Access | Protected endpoints answering without a token or with an invalid one | API2 Broken Authentication |
+| Cross-Tenant Access | Tenant A reaching objects and lists of tenant B | API1 Broken Object Level Authorization |
+| Custom tests | Your explicit allow/deny cases from the YAML config | - |
+
+Every module records what **passed** as well as what failed, and explains inconclusive or skipped cases.
+
+### How a verdict is reached
+
+```
+Baseline  alice -> GET /api/orders/101   200, her own order
+Test      bob   -> GET /api/orders/101   ?
+```
+
+| Observed for the other identity | Verdict |
+|---|---|
+| 401 / 403 / 404, redirect to a login page | pass |
+| 200 with an empty body, `[]` or `{}` | pass: filtering, **not** BOLA |
+| 200 with an error envelope (`{"error": ...}`) | pass: soft denial |
+| 200 with the same object (id match, at least 50% identical fields) | **violation** |
+| 200 with data that does not match the object | needs review |
+| 400 / 422 / 5xx / unfollowed redirect, or the owner's own baseline failed | inconclusive |
+
+## Workflow
+
+1. **Target**: base URL and an explicit list of allowed hosts.
+2. **Endpoints**: import OpenAPI 3 / Swagger 2 (JSON, YAML) or a Postman collection (v2.0, v2.1), or add them by
+   hand. Specs describe *how* to authenticate, not *who owns what*, so access rules are proposed and marked
+   "inferred" until you confirm them.
+3. **Identities**: guest, users, admins, optionally with a tenant. Credentials as Bearer token, custom header,
+   cookie, API key in the query string, HTTP Basic, or a login flow that fetches the token at the start of each run.
+4. **Objects**: which test objects belong to whom (`order 101 -> alice`), including parents for nested paths like
+   `/users/{user_id}/orders/{order_id}`.
+5. **Policy**: per endpoint `public`, `authenticated`, `owner`, `tenant` or `roles`, restricted response fields,
+   and per-cell overrides in the Permission Matrix.
+6. **Run** and read the matrix, the findings and the reports (HTML, Markdown, JSON, pytest).
+
+The interface has six screens: Dashboard, API Explorer, Identity Manager, Permission Matrix, Test Runner, and
+Findings & Reports.
+
+| API Explorer | Identity Manager |
+|---|---|
+| ![API Explorer](docs/screenshots/explorer.png) | ![Identity Manager](docs/screenshots/identities.png) |
+
+## Quick start (Docker)
+
+Requires Docker with Compose v2.
 
 ```bash
-git clone https://github.com/TroubieD3v/APIAuthorizationTester.git && cd APIAuthorizationTester
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+git clone https://github.com/TroubieD3v/APIAuthorizationTester.git
+cd APIAuthorizationTester
+docker compose up --build
+```
+
+Open <http://localhost:8080>, click **Load demo project**, then **Test Runner -> Start run**. Ports `8080`
+(AuthScope) and `8000` (demo API) are bound to the loopback interface only. Data is kept in the `authscope-data`
+volume; `docker compose down --volumes` deletes it.
+
+**Troubleshooting**
+
+- *Port 8080 or 8000 already in use*: `AUTHSCOPE_PORT=8090 DEMO_PORT=8001 docker compose up --build`
+  (PowerShell: `$env:AUTHSCOPE_PORT=8090; docker compose up --build`).
+- *Open it as `localhost` or `127.0.0.1`*: other host names are rejected (DNS-rebinding protection).
+- *Identities show "no token" after a restart*: tokens typed in the UI live in memory only. Enter them again or
+  pass `AUTHSCOPE_TOKEN_<NAME>` environment variables.
+
+## Local development (no Docker)
+
+```bash
+python -m venv .venv && . .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-cd frontend && npm install && npm run build && cd ..   # builds the web UI once
+cd frontend && npm install && npm run build && cd ..
 
-python -m demo_api &                  # intentionally vulnerable demo API on :8000
-authscope serve                       # UI + API on http://localhost:8080
+python -m demo_api                    # 1. demo API on :8000 (separate terminal)
+authscope serve                       # 2. UI + API on :8080
+cd frontend && npm run dev            # optional: UI with hot reload on :5173
 ```
 
-Open <http://localhost:8080>, click **Load demo project**, go to **Test Runner -> Start run**, then open
-**Permission Matrix** and **Findings & Reports**.
-
-### Docker
-
-```bash
-docker compose up --build             # UI on http://localhost:8080, demo API on :8000
-AUTHSCOPE_PORT=8090 DEMO_PORT=8001 docker compose up --build   # if those ports are taken
-```
-
-Both ports are published on 127.0.0.1 only. In the UI, the demo address is pre-filled with `http://demo-api:8000`.
-
-### CLI / CI
+## Command line and CI
 
 ```bash
 set -a; . examples/demo.env; set +a
 authscope run -c examples/demo.authscope.yaml -f md -o report.md        # exit code 1 if violations
-authscope run -c examples/demo.authscope.yaml -f pytest -o test_authz_regression.py
-authscope run -c my.yaml -m bola -m bfla --allow-mutating               # selected modules, writes enabled
+authscope run -c examples/demo.authscope.yaml -f pytest -o test_authz.py  # regression tests from findings
+authscope run -c my.yaml -m bola -m bfla --allow-mutating               # chosen modules, writes enabled
 ```
 
-`.github/workflows/ci.yml` contains an `authz-gate` job showing AuthScope as an authorization regression
-gate in CI.
-
-## How it works
-
-1. **Target** - base URL and an explicit list of allowed hosts.
-2. **Endpoints** - import **OpenAPI/Swagger** (JSON/YAML) or a **Postman collection** (v2.0/v2.1), or add them by
-   hand. Specs say *how* to authenticate, not *who owns what*, so access rules are only **inferred** (and marked so)
-   until you confirm them.
-3. **Identities** - test accounts with a role and (optionally) a tenant. Credentials come from:
-   - a token typed in the UI (write-only, kept in server memory only),
-   - `AUTHSCOPE_TOKEN_<NAME>` environment variables,
-   - a **login flow**: AuthScope calls your login endpoint at the start of each run with
-     `AUTHSCOPE_PASSWORD_<NAME>` (or a password typed in the UI) and takes the token from the JSON response.
-
-   Secrets are never written to YAML, SQLite or reports.
-4. **Resources** - which test objects belong to which identity (`order 101 -> alice`).
-5. **Policy** - per endpoint: `public`, `authenticated`, `owner`, `tenant` or `roles`, plus `allow_roles`, BOPLA
-   `restricted_fields`, and manual cell overrides in the Permission Matrix.
-6. **Run** and read the matrix and the evidence.
-
-### Smart comparison
-
-```
-Baseline  - alice -> GET /api/orders/101   200 OK, her own order
-Test      - bob   -> GET /api/orders/101   ?
-```
-
-| Observed for the other identity                         | Verdict |
-|---------------------------------------------------------|---------|
-| 401 / 403 / 404, redirect to a login page               | pass |
-| **200 with an empty body / `[]` / `{}`**                | pass - filtering, *not* BOLA |
-| 200 whose body is an error envelope (`{"error": ...}`)  | pass - soft denial |
-| 200 with the same object (id match, field overlap >= 50% with the baseline) | **violation** |
-| 200 with data that does not match the object            | needs review (endpoint may ignore the id) |
-| 400/405/422/5xx, unfollowed redirect                    | inconclusive - authorization was not evaluated |
-| baseline itself failed (owner got 404)                  | inconclusive - fix the test data |
-
-Every result is recorded - passes and skips too - so a report shows what was verified, not only what broke.
-
-### Modules
-
-| Module | Checks |
-|---|---|
-| **BOLA / IDOR** | owner baseline vs. other same-tenant identities; list endpoints must not leak foreign objects |
-| **BFLA** | every role calls every role-restricted function |
-| **BOPLA** | restricted JSON properties (`internalNotes`) must not appear for roles that may not see them; entitled roles act as controls, so a wrong field name is detected instead of giving a false "pass" |
-| **Unauthenticated** | no credentials and an invalid token on every non-public endpoint; public endpoints as controls |
-| **Cross-Tenant** | identities of tenant A request objects and lists of tenant B |
-| **Custom tests** | explicit `tests:` from the YAML |
-| **Authorization regression** | compare any two runs: new / fixed / unchanged findings (UI "Compare", `GET /api/runs/{id}/diff`), pytest export of findings |
-
-Planned: Mass Assignment and Session Authorization modules, Burp Suite extension.
-
-### UI screens
-
-**Dashboard** - **API Explorer** (target, import, endpoint rules) - **Identity Manager** (identities, tokens,
-login flows, object ownership) - **Permission Matrix** (expected vs. real, click to override) - **Test Runner**
-(modules, limits, progress, cancel) - **Findings & Reports** (evidence, run comparison, HTML / Markdown / JSON /
-pytest export).
-
-### Evidence
-
-Each finding contains the baseline and test request/response pair, the response differences, the expected policy,
-and a `curl` reproduction that reads the token from an environment variable. Tokens (known values, JWTs, `Bearer ...`),
-passwords, sensitive JSON keys (`password`, `secret`, `token`, `ssn`, ...), card numbers (Luhn) and e-mail addresses
-are masked; bodies are truncated. The pytest export asserts the *expected* policy, so each test fails until the issue
-is fixed and then guards against regressions.
-
-## Config file
+Tokens never go into the config: use `AUTHSCOPE_TOKEN_<NAME>` / `AUTHSCOPE_PASSWORD_<NAME>`. A minimal config:
 
 ```yaml
 target:
   base_url: http://127.0.0.1:8000
   allowed_hosts: [127.0.0.1]
-identities: [alice, bob, admin]            # or full objects: {name, role, tenant, auth, login}
+identities: [alice, bob, admin]
 resources:
   - { type: order, id: 101, owner: alice }
-  - { type: order, id: 102, owner: bob }
 endpoints:
   - { method: GET, path: "/api/orders/{order_id}", access: owner, allow_roles: [admin], resource_type: order }
 tests:
   - { name: Cross-user order access, path: /api/orders/101, identity: bob, expected: deny, baseline_identity: alice }
 ```
 
-Full annotated example: [`examples/demo.authscope.yaml`](examples/demo.authscope.yaml). With the CLI, add
-`openapi: ./spec.yaml` or `postman: ./collection.json` to merge endpoints from a file
-(see [`examples/demo.postman_collection.json`](examples/demo.postman_collection.json)).
+Full example: [examples/demo.authscope.yaml](examples/demo.authscope.yaml). Add `openapi: ./spec.yaml` or
+`postman: ./collection.json` to merge endpoints from a file. The `authz-gate` job in
+[ci.yml](.github/workflows/ci.yml) shows AuthScope as an authorization regression gate.
 
-## Safety model
+## Safety
 
-- **Explicit allow-list**: `allowed_hosts` is required for non-loopback targets, no wildcards. Hosts, ports, schemes
-  and `user:pass@` URLs are validated for every request; paths that could change the host are refused.
-- **Address checks**: the resolved IP is checked before each request; link-local / cloud-metadata
-  (169.254.0.0/16, fe80::/10), multicast and unspecified addresses are always blocked.
-- **Redirects** are not followed by default. With `max_redirects > 0` every hop is re-validated.
-- **Rate limit and budget**: 5 rps default and a per-run request budget (500); when it runs out the run stops and
-  the rest is marked skipped.
-- **Read-only by default**: PUT/POST/PATCH/DELETE are blocked in the HTTP engine itself unless `allow_mutating` is
-  on, which additionally requires a `reset` endpoint (called after every state-changing request; a failed reset stops
-  further writes) or an explicit `acknowledge_no_reset`. Use disposable test data. The only exception is the
-  identity's own login request.
-- **Secrets** never touch YAML, the database or reports.
-- **The web service itself** can send requests to your targets, so it binds to `127.0.0.1`, rejects foreign `Host`
-  headers (DNS rebinding) and `authscope serve` refuses a public bind without `--i-know-this-is-exposed`.
-  Spec URLs are fetched through the same allow-list.
+- Explicit host allow-list, no wildcards; host, port, scheme, credentials-in-URL and path checked per request.
+- Resolved addresses checked; link-local and cloud-metadata ranges always blocked; redirects not followed by default.
+- 5 requests/s and a 500-request budget per run by default.
+- Read-only by default. State-changing tests need an explicit switch and a reset endpoint that runs after every write.
+- Secrets are never stored in the config, the database or reports; evidence is masked.
+- The service binds to `127.0.0.1` and rejects foreign `Host` headers.
 
-Known limits: DNS is checked right before a request, not pinned (only allow-list hosts you control);
-state-changing tests are judged by status code; the login flow supports JSON login endpoints that return the token
-in the response body.
-
-See [SECURITY.md](SECURITY.md) for reporting vulnerabilities in AuthScope itself.
-
-## Demo API
-
-`python -m demo_api` starts an intentionally vulnerable API with one flaw per module. `DEMO_VULNS` selects flaws
-(`bola,bfla,bopla,unauth,tenant`; set it empty for a fully secure variant). The test suite runs AuthScope against
-both variants: every planted flaw must be found, and the secure variant must produce **zero** findings.
-**Never deploy it.**
-
-## Development
+## Tests
 
 ```bash
-pytest                         # unit + end-to-end tests against the demo API (vulnerable and secure)
-playwright install chromium && pytest -m e2e    # browser test of the UI workflow (needs the built UI)
-cd frontend && npm run dev     # UI on :5173, proxies /api to :8080
+pytest                                  # 45 tests: engine, modules, imports, API, CLI, against the demo API
+playwright install chromium
+pytest -m e2e                           # browser test of the full UI workflow
+python scripts/screenshots.py           # regenerate the screenshots in this README
 ```
 
-Layout:
+The demo API plants one flaw per module and can be switched to a fully secure mode (`DEMO_VULNS=`). The suite
+proves that every planted flaw is found **and** that the secure variant produces zero findings. CI also builds the
+Docker image and runs the browser test.
+
+## Architecture
 
 ```
-backend/authscope/   config, safety, http_engine, compare, policy, modules/, runner,
-                     openapi_import, postman_import, reports, storage, api, cli
-backend/demo_api/    intentionally vulnerable demo API
-frontend/            React + TypeScript + Tailwind, shadcn-style components in src/components/ui
-tests/               unit, integration, CLI, e2e (Playwright)
+Browser ──► AuthScope (FastAPI :8080, serves the React UI) ──► Requester (guard, rate limit) ──► your API
+                    └──► SQLite: projects, runs, masked results
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for adding a module.
+- `backend/authscope/`: config and policy, safety guard, HTTP engine, comparison, modules, runner, importers,
+  reports, storage, web API, CLI.
+- `backend/demo_api/`: the intentionally vulnerable demo API.
+- `frontend/`: React + TypeScript + Vite + Tailwind CSS, shadcn-style components.
+- `tests/`: unit, integration, CLI and Playwright tests. `docs/`: architecture and threat model.
+
+Details: [docs/architecture.md](docs/architecture.md) · [docs/threat-model.md](docs/threat-model.md) ·
+[CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md).
+
+## Roadmap
+
+Mass Assignment and Session Authorization modules, and a Burp Suite extension, are tracked as
+[issues](https://github.com/TroubieD3v/APIAuthorizationTester/issues).
+
+## Releases
+
+| Version | Result |
+|---|---|
+| v1.0.0 | Five modules, baseline comparison, evidence and reports, OpenAPI and Postman import, login flow, web UI, CLI, Docker |
+| **v1.1.0** | **API key and HTTP Basic auth, nested object paths, screenshots, docs, issue and PR templates** |
 
 ## License
 
-[MIT](LICENSE) - TroubieD3v
+[MIT](LICENSE)
