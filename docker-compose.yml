@@ -2,6 +2,8 @@
 #   docker compose up --build        ->  http://localhost:8080
 # Ports are published on 127.0.0.1 only: AuthScope can send requests to your test targets,
 # so do not expose it to a network without your own access control.
+name: authscope
+
 services:
   authscope:
     build: .

@@ -1,6 +1,6 @@
 # AuthScope: платформа для тестирования авторизации API
 
-[![CI](https://github.com/TroubieD3v/APIAuthorizationTester/actions/workflows/ci.yml/badge.svg)](https://github.com/TroubieD3v/APIAuthorizationTester/actions/workflows/ci.yml)
+[![CI](https://github.com/TroubieD3v/AuthScope/actions/workflows/ci.yml/badge.svg)](https://github.com/TroubieD3v/AuthScope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-a2a6ae)](LICENSE)
 ![OWASP API Security Top 10:2023](https://img.shields.io/badge/OWASP%20API%20Top%2010-2023-e8a33d)
 ![Modules](https://img.shields.io/badge/modules-5-2dd4bf)
@@ -64,7 +64,8 @@ Test      bob   -> GET /api/orders/101   ?
 | 401 / 403 / 404, редирект на страницу входа | pass |
 | 200 с пустым телом, `[]` или `{}` | pass: фильтрация, **не** BOLA |
 | 200 с ошибкой в теле (`{"error": ...}`) | pass: мягкий отказ |
-| 200 с тем же объектом (совпал id, не менее 50% одинаковых полей) | **нарушение** |
+| 200 с id запрошенного объекта, подтверждённым другими полями владельца | **нарушение** |
+| 200 с похожими данными, но без совпадения id, или id с посторонними данными | нужна ручная проверка |
 | 200 с данными, которые не соответствуют объекту | нужна ручная проверка |
 | 400 / 422 / 5xx / редирект без перехода, или не прошёл baseline владельца | неопределённо |
 
@@ -94,8 +95,8 @@ Findings & Reports.
 Нужен Docker с Compose v2.
 
 ```bash
-git clone https://github.com/TroubieD3v/APIAuthorizationTester.git
-cd APIAuthorizationTester
+git clone https://github.com/TroubieD3v/AuthScope.git
+cd AuthScope
 docker compose up --build
 ```
 
@@ -155,8 +156,9 @@ tests:
 
 - Явный список разрешённых хостов, без wildcard; хост, порт, схема, логин/пароль в URL и путь проверяются для
   каждого запроса.
-- Проверяются итоговые IP-адреса; link-local и адреса облачных метаданных всегда заблокированы; редиректы по
-  умолчанию не выполняются.
+- Хост резолвится один раз на запрос, адрес проверяется, и соединение идёт ровно на этот адрес (DNS pinning;
+  заголовок Host и имя для TLS сохраняются). Link-local и адреса облачных метаданных всегда заблокированы; редиректы
+  по умолчанию не выполняются.
 - По умолчанию 5 запросов в секунду и не более 500 запросов за запуск.
 - По умолчанию только чтение. Изменяющие проверки включаются явно и требуют эндпоинта сброса, который вызывается
   после каждой записи.
@@ -166,7 +168,7 @@ tests:
 ## Тесты
 
 ```bash
-pytest                                  # 45 тестов: движок, модули, импорт, API, CLI на демо-API
+pytest                                  # 53 теста: движок, модули, импорт, API, CLI на демо-API
 playwright install chromium
 pytest -m e2e                           # браузерный тест всего сценария в интерфейсе
 python scripts/screenshots.py           # перегенерировать скриншоты для README
@@ -195,14 +197,15 @@ python scripts/screenshots.py           # перегенерировать ск�
 ## Планы
 
 Модули Mass Assignment и Session Authorization, а также расширение для Burp Suite ведутся в
-[issues](https://github.com/TroubieD3v/APIAuthorizationTester/issues).
+[issues](https://github.com/TroubieD3v/AuthScope/issues).
 
 ## Релизы
 
 | Версия | Что вошло |
 |---|---|
 | v1.0.0 | Пять модулей, сравнение с baseline, доказательства и отчёты, импорт OpenAPI и Postman, вход через login-эндпоинт, веб-интерфейс, CLI, Docker |
-| **v1.1.0** | **API-ключ в query и HTTP Basic, вложенные пути объектов, скриншоты, документация, шаблоны issue и PR** |
+| v1.1.0 | API-ключ в query и HTTP Basic, вложенные пути объектов, скриншоты, документация, шаблоны issue и PR |
+| **v1.2.0** | **Строже сравнение (для нарушения нужен id объекта), DNS pinning, репозиторий переименован в AuthScope** |
 
 ## Лицензия
 

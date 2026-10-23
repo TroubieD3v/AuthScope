@@ -2,7 +2,7 @@
 
 ```
 Browser ──► AuthScope (FastAPI, 127.0.0.1:8080) ──► Requester ──► target API (allowed hosts only)
-             │  serves the built React UI            │ guard: allow-list, address + redirect checks,
+             │  serves the built React UI            │ guard: allow-list, DNS pinning, redirect checks,
              │  /api/* control plane                 │ rate limit, request budget, read-only mode
              └─► SQLite (projects, runs, results)    └─► masked evidence only
 ```

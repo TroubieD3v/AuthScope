@@ -41,6 +41,27 @@ def test_same_object_is_allowed_data():
     assert o.kind == "allowed_data" and o.overlap == 1.0
 
 
+def test_similar_data_without_the_object_id_is_not_a_violation():
+    # a different order that happens to share item, total and address with the owner's order
+    other = resp(200, '{"id": 102, "item": "keyboard", "total": 129.9, "address": "12 Birch"}')
+    o = classify(other, baseline=OWNER, id_field="id", resource_id="101")
+    assert o.kind == "allowed_ambiguous" and o.overlap == 0.75 and "not proven" in o.detail
+
+
+def test_coincidental_id_with_unrelated_data_is_ambiguous():
+    o = classify(resp(200, '{"id": 101, "kind": "coupon", "code": "X1"}'), baseline=OWNER, resource_id="101")
+    assert o.kind == "allowed_ambiguous" and o.id_match and "coincidental" in o.detail
+
+
+def test_id_match_without_baseline_is_enough():
+    assert classify(resp(200, '{"id": 101, "x": 1}'), resource_id="101").kind == "allowed_data"
+
+
+def test_function_level_similarity_without_resource():
+    base = resp(200, '{"users": 4, "orders": 3}')
+    assert classify(resp(200, '{"users": 4, "orders": 3}'), baseline=base).kind == "allowed_data"
+
+
 def test_200_with_other_data_is_ambiguous_not_violation():
     o = classify(resp(200, '{"id": 7, "item": "sock", "total": 3}'), baseline=OWNER, resource_id="101")
     assert o.kind == "allowed_ambiguous"
@@ -258,3 +279,64 @@ def test_openapi_nested_paths_get_param_types():
     r = infer_rules("get", "/users/{user_id}/orders/{order_id}", False)
     assert r["resource_type"] == "order" and r["param_types"] == {"user_id": "user", "order_id": "order"}
     assert r["access"] == "owner"
+
+
+# -- DNS pinning ----------------------------------------------------------------------------
+async def test_pin_connects_to_the_validated_ip_and_keeps_the_name():
+    g = TargetGuard(TargetConfig(base_url="https://api.example.test", allowed_hosts=["api.example.test"]))
+
+    async def fake_resolve(url):
+        return [ipaddress.ip_address("203.0.113.7")]
+
+    g.check_resolved = fake_resolve  # type: ignore[method-assign]
+    p = await g.pin("https://api.example.test/orders/1?x=1")
+    assert p.url == "https://203.0.113.7:443/orders/1?x=1"
+    assert p.host == "api.example.test" and p.sni == "api.example.test" and p.extensions == {"sni_hostname": "api.example.test"}
+
+
+async def test_requester_resolves_once_and_never_reconnects_by_name(monkeypatch):
+    import httpx
+
+    from authscope.http_engine import Requester
+
+    target = TargetConfig(base_url="http://api.example.test:8000", allowed_hosts=["api.example.test"])
+    req = Requester(target, lambda i: None)
+    answers = iter([[ipaddress.ip_address("198.51.100.10")], [ipaddress.ip_address("169.254.169.254")]])
+    calls = []
+
+    async def rebinding_dns(url):
+        calls.append(url)
+        return next(answers)  # a second lookup would return the metadata address
+
+    req.guard.check_resolved = rebinding_dns  # type: ignore[method-assign]
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((str(request.url), request.headers["host"], request.headers.get("cookie")))
+        return httpx.Response(200, json={"ok": True})
+
+    await req._client.aclose()
+    req._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    from authscope.config import Identity
+
+    raw = await req.send("GET", "/a", identity=Identity(name="c", auth={"type": "cookie", "cookie_name": "sid"}))
+    await req.aclose()
+    assert raw.status == 200 and len(calls) == 1
+    assert seen == [("http://198.51.100.10:8000/a", "api.example.test:8000", None)]  # no token -> no cookie
+    assert raw.url == "http://api.example.test:8000/a"  # evidence shows the name, not the IP
+
+
+async def test_pin_refuses_forbidden_answers():
+    g = TargetGuard(TargetConfig(base_url="http://api.example.test", allowed_hosts=["api.example.test"]))
+
+    async def metadata_dns(url):
+        from authscope.safety import ip_is_forbidden
+
+        ip = ipaddress.ip_address("169.254.169.254")
+        if ip_is_forbidden(ip):
+            raise SafetyError("forbidden")
+        return [ip]
+
+    g.check_resolved = metadata_dns  # type: ignore[method-assign]
+    with pytest.raises(SafetyError):
+        await g.pin("http://api.example.test/x")

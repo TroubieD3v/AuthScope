@@ -135,7 +135,7 @@ class Requester:
         self._resolve = resolve_secret
         self._client = httpx.AsyncClient(
             timeout=target.timeout_s, follow_redirects=False, verify=target.verify_tls,
-            trust_env=False, headers={"User-Agent": "AuthScope/1.1 (authorization tester)"},
+            trust_env=False, headers={"User-Agent": "AuthScope/1.2 (authorization tester)"},
         )
 
     async def aclose(self) -> None:
@@ -196,7 +196,7 @@ class Requester:
         if not login:
             self.guard.check_method(method)
         url = self.guard.build_url(path)
-        await self.guard.check_resolved(url)
+        pinned = await self.guard.pin(url)
         self.budget.consume()
         await self.limiter.acquire()
 
@@ -207,9 +207,9 @@ class Requester:
         if body is not None:
             content = json.dumps(body)
             headers["Content-Type"] = "application/json"
+        if cookies:  # sent as a header: the request URL carries the pinned IP, not the cookie domain
+            headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in cookies.items())
         shown_headers = dict(headers)
-        if cookies:
-            shown_headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in cookies.items())
         raw = RawResponse(method=method, url=url + (_qs(query) if query else ""), label=label,
                           identity=identity.name if identity else None,
                           request_headers=shown_headers, request_body=content)
@@ -218,8 +218,8 @@ class Requester:
             current = url
             for hop in range(self.target.max_redirects + 1):
                 async with self._client.stream(
-                    method, current, params=query if hop == 0 else None, headers=headers,
-                    cookies=cookies or None, content=content,
+                    method, pinned.url, params=query if hop == 0 else None,
+                    headers={**headers, "Host": pinned.host}, content=content, extensions=pinned.extensions,
                 ) as resp:
                     chunks, size = [], 0
                     async for chunk in resp.aiter_bytes():
@@ -233,7 +233,7 @@ class Requester:
                 loc = raw.headers.get("location")
                 if raw.status in (301, 302, 303, 307, 308) and loc and hop < self.target.max_redirects:
                     nxt = self.guard.resolve_redirect(current, loc)  # raises SafetyError if off-list
-                    await self.guard.check_resolved(nxt)
+                    pinned = await self.guard.pin(nxt)
                     self.budget.consume()
                     await self.limiter.acquire()
                     raw.redirect_chain.append(nxt)

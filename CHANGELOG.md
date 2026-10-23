@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0
+
+- Comparison: an object-level violation now requires the requested object's id in the response, corroborated by
+  at least a quarter of the owner's other fields. Look-alike data without the id, or an id surrounded by unrelated
+  data, is reported as "needs review" instead of a violation. New false-positive tests.
+- DNS pinning: each request resolves the host once, validates the address and connects to exactly that IP, keeping
+  the Host header and TLS server name. Redirect hops and OpenAPI URL fetches are pinned the same way. Cookies are sent
+  as an explicit header.
+- Repository renamed to `TroubieD3v/AuthScope`; links, clone command and package metadata updated.
+- Docker Compose project name fixed to `authscope`.
+
 ## 1.1.0
 
 - Authentication: API key in a query parameter (`auth.type: query`) and HTTP Basic (`auth.type: basic`,

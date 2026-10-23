@@ -160,6 +160,16 @@ async def test_query_and_basic_auth_identities(demo_url, monkeypatch):
     assert "api_key=$AUTHSCOPE_TOKEN_ALICE" in nested.evidence.reproduction[0]
 
 
+async def test_hostname_target_is_pinned_and_keeps_host_header(demo_url, demo_secrets, monkeypatch):
+    monkeypatch.delenv("DEMO_VULNS", raising=False)
+    port = demo_url.rsplit(":", 1)[1]
+    cfg = demo_config(f"http://localhost:{port}")
+    runner = TestRunner(cfg, demo_secrets, "p", ["bfla"])
+    results = await runner.run()
+    hit = pick(results, identity="alice", endpoint_key="GET /api/admin/stats")[0]
+    assert hit.verdict == "violation" and hit.evidence.test.url.startswith("http://localhost:")
+
+
 async def test_rate_limit_and_budget(demo_url, demo_secrets):
     cfg = demo_config(demo_url)
     cfg.target.max_requests = 5

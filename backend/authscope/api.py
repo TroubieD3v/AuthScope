@@ -152,13 +152,14 @@ def create_app(store: Store | None = None, secrets: SecretStore | None = None) -
         if not content and req.url:
             guard = TargetGuard(cfg.target)
             try:
-                guard.check_url(req.url)
-                await guard.check_resolved(req.url)
+                pinned = await guard.pin(req.url)
             except SafetyError as exc:
                 raise HTTPException(400, f"refused: {exc}") from exc
             try:
-                async with httpx.AsyncClient(timeout=cfg.target.timeout_s, follow_redirects=False, trust_env=False) as c:
-                    async with c.stream("GET", req.url) as resp:
+                async with httpx.AsyncClient(timeout=cfg.target.timeout_s, follow_redirects=False, trust_env=False,
+                                             verify=cfg.target.verify_tls) as c:
+                    async with c.stream("GET", pinned.url, headers={"Host": pinned.host},
+                                        extensions=pinned.extensions) as resp:
                         if resp.status_code != 200:
                             raise HTTPException(400, f"spec URL answered HTTP {resp.status_code}")
                         buf = b""

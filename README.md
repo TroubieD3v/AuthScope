@@ -1,6 +1,6 @@
 # AuthScope: API Authorization Testing Platform
 
-[![CI](https://github.com/TroubieD3v/APIAuthorizationTester/actions/workflows/ci.yml/badge.svg)](https://github.com/TroubieD3v/APIAuthorizationTester/actions/workflows/ci.yml)
+[![CI](https://github.com/TroubieD3v/AuthScope/actions/workflows/ci.yml/badge.svg)](https://github.com/TroubieD3v/AuthScope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-a2a6ae)](LICENSE)
 ![OWASP API Security Top 10:2023](https://img.shields.io/badge/OWASP%20API%20Top%2010-2023-e8a33d)
 ![Modules](https://img.shields.io/badge/modules-5-2dd4bf)
@@ -60,7 +60,8 @@ Test      bob   -> GET /api/orders/101   ?
 | 401 / 403 / 404, redirect to a login page | pass |
 | 200 with an empty body, `[]` or `{}` | pass: filtering, **not** BOLA |
 | 200 with an error envelope (`{"error": ...}`) | pass: soft denial |
-| 200 with the same object (id match, at least 50% identical fields) | **violation** |
+| 200 containing the requested object's id, backed by the owner's other fields | **violation** |
+| 200 with similar data but no matching id, or an id with unrelated data | needs review |
 | 200 with data that does not match the object | needs review |
 | 400 / 422 / 5xx / unfollowed redirect, or the owner's own baseline failed | inconclusive |
 
@@ -90,8 +91,8 @@ Findings & Reports.
 Requires Docker with Compose v2.
 
 ```bash
-git clone https://github.com/TroubieD3v/APIAuthorizationTester.git
-cd APIAuthorizationTester
+git clone https://github.com/TroubieD3v/AuthScope.git
+cd AuthScope
 docker compose up --build
 ```
 
@@ -150,7 +151,9 @@ Full example: [examples/demo.authscope.yaml](examples/demo.authscope.yaml). Add 
 ## Safety
 
 - Explicit host allow-list, no wildcards; host, port, scheme, credentials-in-URL and path checked per request.
-- Resolved addresses checked; link-local and cloud-metadata ranges always blocked; redirects not followed by default.
+- Each host is resolved once per request, the address is validated, and the connection goes to exactly that address
+  (DNS pinning; Host header and TLS name kept). Link-local and cloud-metadata ranges are always blocked; redirects
+  are not followed by default.
 - 5 requests/s and a 500-request budget per run by default.
 - Read-only by default. State-changing tests need an explicit switch and a reset endpoint that runs after every write.
 - Secrets are never stored in the config, the database or reports; evidence is masked.
@@ -159,7 +162,7 @@ Full example: [examples/demo.authscope.yaml](examples/demo.authscope.yaml). Add 
 ## Tests
 
 ```bash
-pytest                                  # 45 tests: engine, modules, imports, API, CLI, against the demo API
+pytest                                  # 53 tests: engine, modules, imports, API, CLI, against the demo API
 playwright install chromium
 pytest -m e2e                           # browser test of the full UI workflow
 python scripts/screenshots.py           # regenerate the screenshots in this README
@@ -188,14 +191,15 @@ Details: [docs/architecture.md](docs/architecture.md) · [docs/threat-model.md](
 ## Roadmap
 
 Mass Assignment and Session Authorization modules, and a Burp Suite extension, are tracked as
-[issues](https://github.com/TroubieD3v/APIAuthorizationTester/issues).
+[issues](https://github.com/TroubieD3v/AuthScope/issues).
 
 ## Releases
 
 | Version | Result |
 |---|---|
 | v1.0.0 | Five modules, baseline comparison, evidence and reports, OpenAPI and Postman import, login flow, web UI, CLI, Docker |
-| **v1.1.0** | **API key and HTTP Basic auth, nested object paths, screenshots, docs, issue and PR templates** |
+| v1.1.0 | API key and HTTP Basic auth, nested object paths, screenshots, docs, issue and PR templates |
+| **v1.2.0** | **Stricter comparison (object id required for a violation), DNS pinning, repository renamed to AuthScope** |
 
 ## License
 

@@ -8,7 +8,8 @@ import asyncio
 import ipaddress
 import socket
 import time
-from urllib.parse import urljoin, urlsplit
+from dataclasses import dataclass
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from .config import MUTATING_METHODS, TargetConfig
 
@@ -41,6 +42,26 @@ def ip_is_forbidden(ip: ipaddress._BaseAddress) -> bool:
     if ip.is_unspecified or ip.is_multicast or ip.is_link_local:
         return True
     return any(ip in net for net in _ALWAYS_BLOCKED_NETS if net.version == ip.version)
+
+
+@dataclass(frozen=True)
+class Pinned:
+    url: str  # URL with the validated IP as host
+    host: str  # value for the Host header
+    sni: str | None  # TLS server name (https with a host name)
+    ip: str
+
+    @property
+    def extensions(self) -> dict:
+        return {"sni_hostname": self.sni} if self.sni else {}
+
+
+def _is_ip(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+        return True
+    except ValueError:
+        return False
 
 
 class RateLimiter:
@@ -117,7 +138,7 @@ class TargetGuard:
         return url
 
     # -- DNS / address check -----------------------------------------------------------
-    async def check_resolved(self, url: str) -> None:
+    async def check_resolved(self, url: str) -> list[ipaddress._BaseAddress]:
         parts = urlsplit(url)
         host = parts.hostname or ""
         port = parts.port or _default_port(parts.scheme)
@@ -134,3 +155,24 @@ class TargetGuard:
         for ip in addrs:
             if ip_is_forbidden(ip):
                 raise SafetyError(f"'{host}' resolves to forbidden address {ip}")
+        if not addrs:
+            raise SafetyError(f"'{host}' did not resolve to any address")
+        return addrs
+
+    async def pin(self, url: str) -> "Pinned":
+        """Resolve and validate once, then connect to exactly that address (no second DNS lookup).
+
+        The request goes to the validated IP; the original name is kept in the Host header and,
+        for HTTPS, as the TLS server name, so virtual hosts and certificate checks still work.
+        """
+        self.check_url(url)
+        addrs = await self.check_resolved(url)
+        ip = next((a for a in addrs if a.version == 4), addrs[0])
+        parts = urlsplit(url)
+        port = parts.port or _default_port(parts.scheme)
+        ip_host = f"[{ip}]" if ip.version == 6 else str(ip)
+        connect = urlunsplit(parts._replace(netloc=f"{ip_host}:{port}"))
+        host_header = parts.hostname if parts.port in (None, _default_port(parts.scheme)) else f"{parts.hostname}:{port}"
+        literal = _is_ip(parts.hostname or "")
+        sni = parts.hostname if parts.scheme == "https" and not literal else None
+        return Pinned(connect, host_header or "", sni, str(ip))

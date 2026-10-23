@@ -12,6 +12,8 @@ DENIED_STATUS = {401, 403, 404}
 REJECTED_STATUS = {400, 405, 406, 409, 410, 415, 422}
 ERROR_STATUS_WORDS = {"error", "fail", "failed", "forbidden", "unauthorized", "denied", "unauthenticated"}
 LOGIN_HINTS = ("login", "signin", "sign-in", "auth", "sso")
+SIMILAR_OVERLAP = 0.5  # share of the baseline's informative fields that makes two responses "similar"
+MIN_CORROBORATION = 0.25  # an id match must also share this much of the owner's other fields
 
 
 @dataclass
@@ -142,7 +144,7 @@ def classify(resp: RawResponse, *, baseline: RawResponse | None = None, id_field
         return Observation("soft_denied", f"HTTP {s} but body is an error envelope")
 
     id_match = bool(resource_id) and data is not None and find_id(data, id_field, resource_id)
-    overlap, shared = None, []
+    overlap, shared, corroboration = None, [], None
     if baseline is not None and baseline.json is not None and data is not None:
         base_leaves = {(p, repr(v)) for p, v in leaves(baseline.json) if informative(v)}
         test_leaves = {(p, repr(v)) for p, v in leaves(data) if informative(v)}
@@ -150,17 +152,32 @@ def classify(resp: RawResponse, *, baseline: RawResponse | None = None, id_field
             common = base_leaves & test_leaves
             overlap = len(common) / len(base_leaves)
             shared = sorted(p for p, _ in common)
-    if resource_id is None and baseline is None:
-        return Observation("allowed_data", f"HTTP {s} with data", overlap, id_match, shared)
-    if overlap is not None and overlap >= 0.5:
-        return Observation("allowed_data", f"HTTP {s}; {overlap:.0%} of the owner's fields are identical",
-                           overlap, id_match, shared)
-    if id_match:
-        extra = f"; {overlap:.0%} field overlap" if overlap is not None else ""
+            # corroboration ignores the id itself: an id match must be backed by other identical fields
+            not_id = {x for x in base_leaves if x[0].split(".")[-1].rstrip("[]") != id_field}
+            corroboration = len(not_id & test_leaves) / len(not_id) if not_id else None
+    if resource_id is None:
+        # function-level checks: there is no object to identify, data itself is the access
+        if overlap is not None and overlap >= SIMILAR_OVERLAP:
+            return Observation("allowed_data", f"HTTP {s}; {overlap:.0%} of the baseline's fields are identical",
+                               overlap, False, shared)
+        return Observation("allowed_data", f"HTTP {s} with data", overlap, False, shared)
+
+    # Object-level checks: a violation needs the requested object's id in the response, corroborated by the
+    # owner's baseline when there is one. Similar-looking data alone is never proof - two different orders
+    # can share status, item and total - so it goes to manual review instead.
+    if id_match and (corroboration is None or corroboration >= MIN_CORROBORATION):
+        extra = f" and {overlap:.0%} of the owner's fields" if overlap is not None else ""
         return Observation("allowed_data", f"HTTP {s}; response contains object id {resource_id}{extra}",
                            overlap, True, shared)
-    if resource_id is None:
-        return Observation("allowed_data", f"HTTP {s} with data", overlap, False, shared)
+    if id_match:
+        return Observation("allowed_ambiguous",
+                           f"HTTP {s}; object id {resource_id} appears, but only {corroboration:.0%} of the "
+                           "owner's other fields match - possibly a coincidental id", overlap, True, shared)
+    if overlap is not None and overlap >= SIMILAR_OVERLAP:
+        return Observation("allowed_ambiguous",
+                           f"HTTP {s}; {overlap:.0%} of the owner's fields are identical, but object id "
+                           f"{resource_id} was not found - similar data, not proven to be the same object",
+                           overlap, False, shared)
     return Observation("allowed_ambiguous",
                        f"HTTP {s} with data, but it does not match the requested object", overlap, False, shared)
 

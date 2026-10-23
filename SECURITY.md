@@ -5,7 +5,7 @@
 Please do not open a public issue for security problems in AuthScope itself (for example a way to make the
 engine contact a host outside `allowed_hosts`, a secret leaking into reports or storage, or a way to reach the
 local web service from another origin). Use GitHub's private vulnerability reporting on
-<https://github.com/TroubieD3v/APIAuthorizationTester/security/advisories/new> instead.
+<https://github.com/TroubieD3v/AuthScope/security/advisories/new> instead.
 
 Include the version, a minimal config and steps to reproduce. You will get an answer within a week.
 
