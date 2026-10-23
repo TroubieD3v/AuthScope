@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>AuthScope report - {{ d.project }}</title>
+<style>
+ :root{--bg:#0f1419;--panel:#171d25;--line:#2a3340;--text:#e6edf3;--mute:#8b98a8;--bad:#ff6b6b;--warn:#f5b041;--ok:#4cc38a;}
+ *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,Segoe UI,sans-serif}
+ main{max-width:980px;margin:0 auto;padding:32px 20px 80px} h1{margin:0 0 4px} h2{margin-top:36px;border-bottom:1px solid var(--line);padding-bottom:6px}
+ .mute{color:var(--mute)} .cards{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
+ .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:130px}
+ .card b{display:block;font-size:26px}
+ .finding{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--bad);border-radius:8px;padding:14px 16px;margin:14px 0}
+ .finding.needs_review{border-left-color:var(--warn)}
+ .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;background:#2a3340;margin-right:6px}
+ .tag.violation{background:#4a1f24;color:#ffb3b3}.tag.needs_review{background:#4a3a14;color:#ffd699}
+ pre{background:#0b0f14;border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;font-size:12px;white-space:pre-wrap;word-break:break-word}
+ table{border-collapse:collapse;width:100%} td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+ details{margin:8px 0} summary{cursor:pointer;color:var(--mute)}
+ .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:800px){.cols{grid-template-columns:1fr}}
+</style></head><body><main>
+<h1>AuthScope report</h1>
+<div class="mute">{{ d.project }} &middot; target <code>{{ d.target }}</code> &middot; run <code>{{ d.run.id }}</code> ({{ d.run.status }}) &middot; {{ d.run.started_at }}</div>
+<p class="mute">Tokens and sensitive values are masked. Reproduction commands read tokens from environment variables.</p>
+{% for w in d.warnings %}<p style="color:var(--warn)">Warning: {{ w }}</p>{% endfor %}
+{% set v = d.summary.verdicts %}
+<div class="cards">
+ <div class="card"><b style="color:var(--bad)">{{ v.get('violation',0) }}</b>violations</div>
+ <div class="card"><b style="color:var(--warn)">{{ v.get('needs_review',0) }}</b>need review</div>
+ <div class="card"><b style="color:var(--ok)">{{ v.get('pass',0) }}</b>passed</div>
+ <div class="card"><b>{{ v.get('inconclusive',0) + v.get('skipped',0) + v.get('error',0) }}</b>inconclusive / skipped</div>
+</div>
+<h2>Findings ({{ findings|length }})</h2>
+{% if not findings %}<p>No violations or review items were found.</p>{% endif %}
+{% for r in findings %}
+<div class="finding {{ r.verdict }}">
+ <span class="tag {{ r.verdict }}">{{ labels[r.verdict] }}</span><span class="tag">{{ r.severity }}</span><span class="tag">{{ r.module }}</span>
+ <strong>{{ r.name }}</strong>
+ <div class="mute">id {{ r.id }} &middot; {{ r.endpoint_key }}{% if r.resource %} &middot; {{ r.resource }}{% endif %}</div>
+ <p>{{ r.message }}</p>
+ {% if r.evidence %}
+  <div class="mute">Expected policy: {{ r.evidence.expected }}</div>
+  {% if r.evidence.diff %}<ul>{% for line in r.evidence.diff %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
+  <div class="cols">
+   {% for title, ex in (('Baseline', r.evidence.baseline), ('Test', r.evidence.test)) %}{% if ex %}
+   <div><strong>{{ title }}</strong> <span class="mute">{{ ex.identity or 'anonymous' }}</span>
+    <pre>{{ ex.method }} {{ ex.url }}{% for k, val in ex.request_headers.items() %}
+{{ k }}: {{ val }}{% endfor %}{% if ex.request_body %}
+
+{{ ex.request_body }}{% endif %}</pre>
+    <pre>{% if ex.status is not none %}HTTP {{ ex.status }}{% else %}ERROR {{ ex.error }}{% endif %}
+{{ ex.response_body or '' }}</pre></div>
+   {% endif %}{% endfor %}
+  </div>
+  {% if r.evidence.reproduction %}<details><summary>Reproduce</summary><pre>{{ r.evidence.reproduction|join('\n\n') }}</pre></details>{% endif %}
+ {% endif %}
+</div>
+{% endfor %}
+<h2>Passed checks ({{ passed|length }})</h2>
+<table><tr><th>Module</th><th>Check</th><th>Result</th></tr>
+{% for r in passed %}<tr><td>{{ r.module }}</td><td>{{ r.name }}</td><td class="mute">{{ r.message }}</td></tr>{% endfor %}</table>
+{% if rest %}<h2>Inconclusive, skipped and errors ({{ rest|length }})</h2>
+<table><tr><th>Verdict</th><th>Check</th><th>Reason</th></tr>
+{% for r in rest %}<tr><td>{{ r.verdict }}</td><td>{{ r.name }}</td><td class="mute">{{ r.message }}</td></tr>{% endfor %}</table>{% endif %}
+</main></body></html>

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "authscope"
+version = "1.0.0"
+description = "AuthScope - API authorization testing platform (BOLA/IDOR, BFLA, BOPLA, tenant isolation)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "TroubieD3v" }]
+keywords = ["appsec", "api-security", "bola", "idor", "bfla", "authorization", "pentest", "owasp"]
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "httpx>=0.27",
+  "pydantic>=2.9",
+  "pyyaml>=6.0",
+  "jinja2>=3.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/TroubieD3v/APIAuthorizationTester"
+Issues = "https://github.com/TroubieD3v/APIAuthorizationTester/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "playwright>=1.45", "pytest-playwright>=0.5"]
+
+[project.scripts]
+authscope = "authscope.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+
+[tool.setuptools.package-data]
+authscope = ["templates/*.j2"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = ["e2e: browser tests with Playwright (run separately: pytest -m e2e)"]
+addopts = "-m 'not e2e'"
+pythonpath = ["backend"]

@@ -1,0 +1,52 @@
+{
+  "info": {
+    "_postman_id": "0b7e4a3c-6f1d-4d8e-9a52-3c1f2e7a9b10",
+    "name": "AuthScope demo API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+  "variable": [{ "key": "baseUrl", "value": "http://127.0.0.1:8000" }],
+  "item": [
+    {
+      "name": "system",
+      "item": [
+        { "name": "Health", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/health" } }
+      ]
+    },
+    {
+      "name": "users",
+      "item": [
+        { "name": "Current user", "request": { "method": "GET", "url": "{{baseUrl}}/api/users/me" } },
+        {
+          "name": "Get user",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/users/:user_id", "host": ["{{baseUrl}}"], "path": ["api", "users", ":user_id"],
+                     "variable": [{ "key": "user_id", "value": "1" }] }
+          }
+        },
+        {
+          "name": "Update user",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/users/:user_id",
+            "body": { "mode": "raw", "raw": "{\"username\": \"new-name\"}", "options": { "raw": { "language": "json" } } }
+          }
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "item": [
+        { "name": "List orders", "request": { "method": "GET", "url": "{{baseUrl}}/api/orders" } },
+        { "name": "Get order", "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/{{orderId}}" } }
+      ]
+    },
+    {
+      "name": "admin",
+      "item": [
+        { "name": "Stats", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/stats?verbose=1" } }
+      ]
+    }
+  ]
+}

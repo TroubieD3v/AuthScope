@@ -1,0 +1,69 @@
+# AuthScope config for the bundled demo API (python -m demo_api, port 8000).
+# Secrets are NOT stored here. Tokens come from environment variables:
+#   AUTHSCOPE_TOKEN_ALICE, AUTHSCOPE_TOKEN_BOB, AUTHSCOPE_TOKEN_ADMIN
+# carol shows the login flow instead: AuthScope logs in with AUTHSCOPE_PASSWORD_CAROL.
+# (see examples/demo.env for the throwaway demo values)
+#
+#   authscope run -c examples/demo.authscope.yaml -f md -o report.md
+name: AuthScope demo API
+
+target:
+  base_url: http://127.0.0.1:8000
+  allowed_hosts: [127.0.0.1]     # the engine contacts nothing else
+  rate_limit_rps: 20
+  max_requests: 500
+  allow_mutating: false          # set true (CLI: --allow-mutating) to also run PUT/DELETE tests
+  reset: { method: POST, path: /__demo/reset, identity: admin }
+
+identities:
+  - { name: guest, role: guest }                     # no credentials
+  - { name: alice, role: user, tenant: acme }
+  - { name: bob,   role: user, tenant: acme }
+  - name: carol
+    role: user
+    tenant: globex
+    login:                                           # token is fetched at the start of each run
+      path: /api/auth/login
+      body: { username: carol, password: "${password}" }   # ${password} = AUTHSCOPE_PASSWORD_CAROL
+      token_path: access_token
+  - { name: admin, role: admin }                     # platform admin, no tenant
+
+resources:                                           # who owns which test object
+  - { type: user,    id: 1,   owner: alice }
+  - { type: user,    id: 2,   owner: bob }
+  - { type: user,    id: 3,   owner: carol }
+  - { type: user,    id: 4,   owner: admin }
+  - { type: order,   id: 101, owner: alice }
+  - { type: order,   id: 102, owner: bob }
+  - { type: order,   id: 103, owner: carol }
+  - { type: invoice, id: 201, owner: alice, tenant: acme }
+  - { type: invoice, id: 202, owner: carol, tenant: globex }
+
+endpoints:
+  - { method: GET, path: /health, access: public }
+  - { method: GET, path: /api/users/me, access: authenticated }
+  - method: GET
+    path: /api/users/{user_id}
+    access: owner                                    # owner, or one of allow_roles
+    allow_roles: [admin]
+    resource_type: user
+    restricted_fields:                               # BOPLA: who may see which property
+      - { name: internalNotes, roles: [admin] }
+      - { name: creditLimit,   roles: [admin] }
+  - { method: PUT, path: "/api/users/{user_id}", access: owner, allow_roles: [admin], resource_type: user,
+      body: { username: renamed-by-authscope } }
+  - { method: GET, path: /api/orders, access: authenticated, list_of: order }
+  - { method: GET, path: "/api/orders/{order_id}", access: owner, allow_roles: [admin], resource_type: order }
+  - { method: PUT, path: "/api/orders/{order_id}", access: owner, allow_roles: [admin], resource_type: order,
+      body: { status: tampered } }
+  - { method: GET, path: "/api/orders/{order_id}/items", access: owner, allow_roles: [admin], resource_type: order }
+  - { method: GET, path: "/api/invoices/{invoice_id}", access: tenant, allow_roles: [admin], resource_type: invoice }
+  - { method: GET, path: /api/admin/stats, access: roles, allow_roles: [admin] }
+  - { method: DELETE, path: "/api/admin/users/{user_id}", access: roles, allow_roles: [admin], resource_type: user }
+  - { method: GET, path: /api/reports/summary, access: authenticated }
+
+overrides: []                                        # e.g. - {endpoint: "GET /api/orders/{order_id}", identity: bob, expected: allow}
+
+tests:                                               # explicit cases, as in the project README
+  - { name: Owner order access,      method: GET, path: /api/orders/101, identity: alice, expected: allow, resource: "order:101" }
+  - { name: Cross-user order access, method: GET, path: /api/orders/101, identity: bob,   expected: deny,  resource: "order:101", baseline_identity: alice }

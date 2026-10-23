@@ -1,0 +1,27 @@
+# AuthScope + the intentionally vulnerable demo API.
+#   docker compose up --build        ->  http://localhost:8080
+# Ports are published on 127.0.0.1 only: AuthScope can send requests to your test targets,
+# so do not expose it to a network without your own access control.
+services:
+  authscope:
+    build: .
+    ports: ["127.0.0.1:${AUTHSCOPE_PORT:-8080}:8080"]
+    environment:
+      AUTHSCOPE_DEMO_URL: http://demo-api:8000
+      # Tokens for CI-style runs can be passed as AUTHSCOPE_TOKEN_<NAME> (from your shell / .env):
+      AUTHSCOPE_TOKEN_ALICE: ${AUTHSCOPE_TOKEN_ALICE:-}
+      AUTHSCOPE_TOKEN_BOB: ${AUTHSCOPE_TOKEN_BOB:-}
+      AUTHSCOPE_TOKEN_ADMIN: ${AUTHSCOPE_TOKEN_ADMIN:-}
+    volumes: ["authscope-data:/data"]
+    depends_on: [demo-api]
+
+  demo-api:
+    build: .
+    command: ["python", "-m", "demo_api"]
+    environment:
+      DEMO_HOST: 0.0.0.0
+      DEMO_VULNS: ${DEMO_VULNS-bola,bfla,bopla,unauth,tenant}   # DEMO_VULNS= (empty) makes it secure
+    ports: ["127.0.0.1:${DEMO_PORT:-8000}:8000"]
+
+volumes:
+  authscope-data:
