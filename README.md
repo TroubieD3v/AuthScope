@@ -3,7 +3,7 @@
 [![CI](https://github.com/TroubieD3v/AuthScope/actions/workflows/ci.yml/badge.svg)](https://github.com/TroubieD3v/AuthScope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-a2a6ae)](LICENSE)
 ![OWASP API Security Top 10:2023](https://img.shields.io/badge/OWASP%20API%20Top%2010-2023-e8a33d)
-![Modules](https://img.shields.io/badge/modules-5-2dd4bf)
+![Modules](https://img.shields.io/badge/modules-5-7cc4e8)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-7cc4e8)
 ![Docker Compose](https://img.shields.io/badge/run%20with-Docker%20Compose-a2a6ae)
 
