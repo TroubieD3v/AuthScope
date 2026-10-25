@@ -26,7 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose build
-  # Example of using AuthScope as an authorization regression gate: the secure demo must stay clean.
+  # Authorization gate: AuthScope must be right on both sides - silent on the secure demo, and finding exactly the
+  # planted BOLA/BFLA/BOPLA/unauthenticated/cross-tenant flaws on the vulnerable one, with matching evidence and no
+  # credentials in any report (scripts/ci_gate.py).
   authz-gate:
     runs-on: ubuntu-latest
     steps:
@@ -34,11 +36,15 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -e .
-      - run: |
-          DEMO_VULNS= python -m demo_api &
-          sleep 3
-          set -a; . examples/demo.env; set +a
-          authscope run -c examples/demo.authscope.yaml -f md -o authz-report.md
+      - name: Start secure and vulnerable demo APIs
+        run: |
+          DEMO_VULNS= DEMO_PORT=8000 python -m demo_api &
+          DEMO_VULNS=bola,bfla,bopla,unauth,tenant DEMO_PORT=8001 python -m demo_api &
+          for port in 8000 8001; do
+            for i in $(seq 1 50); do curl -sf "http://127.0.0.1:$port/health" > /dev/null && break; sleep 0.2; done
+          done
+      - name: Run the gate
+        run: python scripts/ci_gate.py --secure http://127.0.0.1:8000 --vulnerable http://127.0.0.1:8001 --out authz-reports
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: authz-report, path: authz-report.md }
+        with: { name: authz-reports, path: authz-reports }

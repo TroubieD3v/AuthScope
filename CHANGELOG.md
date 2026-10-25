@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.0
+
+- CI authorization gate (`scripts/ci_gate.py`) now checks both sides: zero findings on the secure demo, exactly the
+  expected findings (`examples/expected-findings.json`) on the vulnerable one, evidence that targets the reported
+  object with the owner's baseline, and no demo credential in JSON, Markdown, HTML or pytest reports.
+- False-positive corpus (`tests/corpus/cases.yaml`, 40+ annotated responses) and Hypothesis property tests for
+  comparison and masking (#5). Fixes found on the way: empty pagination wrappers count as empty, an HTML login form
+  served with 200 is a soft denial, the same object in a different wrapper still corroborates the owner's response,
+  any other 4xx is "rejected" instead of being read as data, and secrets are masked in JSON keys and header names.
+- Resilience (#6): `429` is retried after `Retry-After` (capped, within the request budget), transport errors are
+  retried with back-off for read-only requests only, and a run stops after 8 consecutive unreachable responses
+  (CLI exit code 3). Retries and back-off time are shown in run statistics and reports. `DEMO_RATE_LIMIT` in the demo
+  API exercises it.
+- Composite identifiers: resources can carry JSONPath match rules (`.key`, `['key']`, `[n]`, `[*]`, `..key`); all rules
+  must match for a confirmed finding, look-alikes stay in "needs review". Editable in the Identity Manager.
+
 ## 1.3.0
 
 - Redesigned web interface in an editorial, bento-grid style: large headlines with status pills, a two-ring dial on

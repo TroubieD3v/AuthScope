@@ -110,7 +110,7 @@ export function Runner() {
             <div className="h-2 w-full overflow-hidden bg-white/10"><div className="h-full bg-[#3fbf75] transition-all" style={{ width: `${pct}%` }} /></div>
             <div className="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-sm">
               <span className="font-semibold">{run.stats.done}/{run.stats.total} checks ({pct}%)</span>
-              <span className="opacity-70">{run.stats.requests} requests</span>
+              <span className="opacity-70">{run.stats.requests} requests{run.stats.retries ? ` · ${run.stats.retries} retries (${run.stats.backoff_s}s back-off)` : ""}</span>
               <span className="font-semibold text-[#f2716b]">{v.violation ?? 0} violations</span>
               <span className="font-semibold text-[#f59a3c]">{v.needs_review ?? 0} review</span>
               <span className="font-semibold text-[#3fbf75]">{v.pass ?? 0} passed</span>

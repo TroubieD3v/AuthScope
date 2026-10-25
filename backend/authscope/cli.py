@@ -65,6 +65,9 @@ def cmd_run(args: argparse.Namespace) -> int:
           file=sys.stderr)
     for w in runner.warnings:
         print(f"warning: {w}", file=sys.stderr)
+    if runner.abort_reason:
+        print(f"error: {runner.abort_reason}", file=sys.stderr)
+        return 3
     return 1 if v.get("violation", 0) else 0
 
 

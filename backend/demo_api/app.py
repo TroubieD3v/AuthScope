@@ -57,8 +57,36 @@ def reset_state() -> None:
 
 
 reset_state()
+_hits: list[float] = []
+
+
+def _rate_limited() -> bool:
+    """DEMO_RATE_LIMIT=N: at most N requests per second (to exercise 429 handling)."""
+    limit = int(os.environ.get("DEMO_RATE_LIMIT", "0") or 0)
+    if limit <= 0:
+        return False
+    import time as _t
+
+    now = _t.monotonic()
+    while _hits and now - _hits[0] > 1:
+        _hits.pop(0)
+    if len(_hits) >= limit:
+        return True
+    _hits.append(now)
+    return False
+
+
 app = FastAPI(title="AuthScope Demo API", version="1.0.0",
               description="Intentionally vulnerable API used to demo AuthScope. Never deploy.")
+
+
+@app.middleware("http")
+async def rate_limit(request, call_next):
+    from fastapi.responses import JSONResponse
+
+    if request.url.path not in ("/health", "/__demo/reset") and _rate_limited():
+        return JSONResponse({"detail": "Too many requests"}, status_code=429, headers={"Retry-After": "1"})
+    return await call_next(request)
 
 
 def vulns() -> set[str]:

@@ -49,7 +49,8 @@ class BoplaModule:
 
     def evaluate(self, case: Case, test, baseline) -> Judgement:
         obs = classify(test, id_field=case.resource.id_field if case.resource else "id",
-                       resource_id=case.resource.id if case.resource else None)
+                       resource_id=case.resource.id if case.resource else None,
+                       match=case.resource.match if case.resource else None)
         if obs.kind == "transport_error":
             return Judgement("error", obs.kind, obs.detail)
         if not obs.allowed or test.json is None:

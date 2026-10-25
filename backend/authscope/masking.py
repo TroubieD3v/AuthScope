@@ -41,14 +41,14 @@ class Masker:
     def headers(self, headers: dict[str, str]) -> dict[str, str]:
         out = {}
         for k, v in headers.items():
-            out[k] = REDACTED if k.lower() in SENSITIVE_HEADERS else self.text(v)
+            out[self.text(k)] = REDACTED if k.lower() in SENSITIVE_HEADERS else self.text(v)
         return out
 
     def json_value(self, value: Any, key: str | None = None) -> Any:
         if key is not None and SENSITIVE_KEY_RE.search(key) and value not in (None, "", [], {}):
             return REDACTED
         if isinstance(value, dict):
-            return {k: self.json_value(v, k) for k, v in value.items()}
+            return {self.text(k): self.json_value(v, k) for k, v in value.items()}  # secrets can hide in keys too
         if isinstance(value, list):
             return [self.json_value(v, key) for v in value]
         if isinstance(value, str):

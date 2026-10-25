@@ -12,3 +12,4 @@ data/
 reports/
 *.egg-info/
 test-results/
+.hypothesis/

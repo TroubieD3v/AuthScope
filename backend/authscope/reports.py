@@ -68,6 +68,7 @@ def to_markdown(run: RunInfo, results: list[CheckResult], cfg: ProjectConfig) ->
         f"- Target: `{cfg.target.base_url}`",
         f"- Run: `{run.id}` ({run.status}), started {run.started_at}",
         f"- Modules: {', '.join(run.modules)}",
+        f"- Requests: {run.stats.requests} (retries {run.stats.retries}, back-off {run.stats.backoff_s} s)",
         f"- Checks: {len(results)} - **{v.get('violation', 0)} violations**, "
         f"{v.get('needs_review', 0)} need review, {v.get('pass', 0)} passed, "
         f"{v.get('inconclusive', 0)} inconclusive, {v.get('skipped', 0)} skipped, {v.get('error', 0)} errors",

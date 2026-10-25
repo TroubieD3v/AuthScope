@@ -1,9 +1,11 @@
 """Async HTTP engine. Every request passes the guard, rate limiter and request budget."""
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import os
+import random
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -11,7 +13,7 @@ from urllib.parse import quote
 
 import httpx
 
-from .config import Identity, TargetConfig
+from .config import SAFE_METHODS, Identity, TargetConfig
 from .models import HttpExchange
 from .masking import Masker
 from .safety import BudgetExceeded, RateLimiter, RequestBudget, SafetyError, TargetGuard
@@ -88,6 +90,7 @@ class RawResponse:
     elapsed_ms: float = 0.0
     error: str | None = None
     redirect_chain: list[str] = field(default_factory=list)
+    attempts: int = 1
     _json: Any = field(default=None, repr=False)
     _json_parsed: bool = field(default=False, repr=False)
 
@@ -119,6 +122,26 @@ class RawResponse:
         )
 
 
+_sleep = asyncio.sleep  # indirection so tests can skip real waiting
+
+
+def retry_after(value: str | None, default: float = 1.0) -> float:
+    """Seconds to wait from a Retry-After header (delta-seconds or HTTP date)."""
+    if not value:
+        return default
+    value = value.strip()
+    if value.isdigit():
+        return float(value)
+    try:
+        from email.utils import parsedate_to_datetime
+        from datetime import datetime, timezone
+
+        when = parsedate_to_datetime(value)
+        return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
+    except (TypeError, ValueError):
+        return default
+
+
 def render_path(path: str, params: dict[str, str]) -> str:
     out = path
     for k, v in params.items():
@@ -132,10 +155,12 @@ class Requester:
         self.guard = TargetGuard(target)
         self.limiter = RateLimiter(target.rate_limit_rps)
         self.budget = RequestBudget(target.max_requests)
+        self.retries = 0
+        self.backoff_s = 0.0
         self._resolve = resolve_secret
         self._client = httpx.AsyncClient(
             timeout=target.timeout_s, follow_redirects=False, verify=target.verify_tls,
-            trust_env=False, headers={"User-Agent": "AuthScope/1.3 (authorization tester)"},
+            trust_env=False, headers={"User-Agent": "AuthScope/1.4 (authorization tester)"},
         )
 
     async def aclose(self) -> None:
@@ -182,6 +207,35 @@ class Requester:
             headers["Authorization"] = "Basic " + base64.b64encode(pair.encode()).decode()
         return headers, cookies, params
 
+    async def _exchange(self, raw: RawResponse, method: str, url: str, pinned, query, headers, content) -> None:
+        current = url
+        for hop in range(self.target.max_redirects + 1):
+            async with self._client.stream(
+                method, pinned.url, params=query if hop == 0 else None,
+                headers={**headers, "Host": pinned.host}, content=content, extensions=pinned.extensions,
+            ) as resp:
+                chunks, size = [], 0
+                async for chunk in resp.aiter_bytes():
+                    size += len(chunk)
+                    chunks.append(chunk)
+                    if size > MAX_RESPONSE_BYTES:
+                        break
+                raw.status = resp.status_code
+                raw.headers = dict(resp.headers)
+                raw.text = b"".join(chunks).decode(resp.encoding or "utf-8", errors="replace")
+            loc = raw.headers.get("location")
+            if raw.status in (301, 302, 303, 307, 308) and loc and hop < self.target.max_redirects:
+                nxt = self.guard.resolve_redirect(current, loc)  # raises SafetyError if off-list
+                pinned = await self.guard.pin(nxt)
+                self.budget.consume()
+                await self.limiter.acquire()
+                raw.redirect_chain.append(nxt)
+                current = nxt
+                if raw.status in (301, 302, 303):
+                    method, content = "GET", None
+                continue
+            break
+
     async def send(
         self, method: str, path: str, *, identity: Identity | None = None, mode: str = "identity",
         query: dict[str, str] | None = None, body: Any = None, label: str = "request",
@@ -214,38 +268,34 @@ class Requester:
                           identity=identity.name if identity else None,
                           request_headers=shown_headers, request_body=content)
         start = time.perf_counter()
-        try:
-            current = url
-            for hop in range(self.target.max_redirects + 1):
-                async with self._client.stream(
-                    method, pinned.url, params=query if hop == 0 else None,
-                    headers={**headers, "Host": pinned.host}, content=content, extensions=pinned.extensions,
-                ) as resp:
-                    chunks, size = [], 0
-                    async for chunk in resp.aiter_bytes():
-                        size += len(chunk)
-                        chunks.append(chunk)
-                        if size > MAX_RESPONSE_BYTES:
-                            break
-                    raw.status = resp.status_code
-                    raw.headers = dict(resp.headers)
-                    raw.text = b"".join(chunks).decode(resp.encoding or "utf-8", errors="replace")
-                loc = raw.headers.get("location")
-                if raw.status in (301, 302, 303, 307, 308) and loc and hop < self.target.max_redirects:
-                    nxt = self.guard.resolve_redirect(current, loc)  # raises SafetyError if off-list
-                    pinned = await self.guard.pin(nxt)
-                    self.budget.consume()
-                    await self.limiter.acquire()
-                    raw.redirect_chain.append(nxt)
-                    current = nxt
-                    if raw.status in (301, 302, 303):
-                        method, content = "GET", None
-                    continue
+        attempt = 0
+        while True:
+            raw.status, raw.headers, raw.text, raw.error, raw.redirect_chain = None, {}, "", None, []
+            delay: float | None = None
+            try:
+                await self._exchange(raw, method, url, pinned, query, headers, content)
+            except SafetyError as exc:
+                raw.error = f"blocked by safety rule: {exc}"
+            except httpx.TransportError as exc:
+                raw.error = f"{type(exc).__name__}: {exc}"
+                if method in SAFE_METHODS or login:  # never resend a write that may have been processed
+                    delay = min(self.target.retry_after_cap_s, 0.5 * 2 ** attempt) + random.uniform(0, 0.25)
+            except httpx.HTTPError as exc:
+                raw.error = f"{type(exc).__name__}: {exc}"
+            if raw.status == 429:  # the server refused before processing, so any method may be retried
+                delay = retry_after(raw.headers.get("retry-after"))
+                if delay > self.target.retry_after_cap_s:
+                    delay = None
+            if delay is None or attempt >= self.target.max_retries or self.budget.used >= self.budget.maximum:
                 break
-        except SafetyError as exc:
-            raw.error = f"blocked by safety rule: {exc}"
-        except httpx.HTTPError as exc:
-            raw.error = f"{type(exc).__name__}: {exc}"
+            attempt += 1
+            self.retries += 1
+            self.backoff_s += delay
+            await _sleep(delay)
+            pinned = await self.guard.pin(url)
+            self.budget.consume()
+            await self.limiter.acquire()
+        raw.attempts = attempt + 1
         raw.elapsed_ms = (time.perf_counter() - start) * 1000
         return raw
 

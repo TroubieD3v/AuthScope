@@ -1,6 +1,7 @@
 """Object-level access testing shared by BOLA (same tenant) and Cross-Tenant (different tenants)."""
 from __future__ import annotations
 
+from .. import jsonpath
 from ..compare import classify, collect_ids
 from ..config import Identity, ProjectConfig, Resource
 from ..http_engine import RawResponse
@@ -58,7 +59,8 @@ def plan_object_cases(cfg: ProjectConfig, module: str) -> list[Case]:
                     name=f"{ident.name} -> {ep.key} must not list {len(foreign)} foreign {ep.list_of}(s)",
                     reason="list must only contain objects the caller may access",
                     variant="list_leak", extra={"foreign": [r.ref for r in foreign],
-                                                "id_field": foreign[0].id_field},
+                                                "id_field": foreign[0].id_field,
+                                                "match": {r.ref: r.match for r in foreign if r.match}},
                     skip_reason=None,
                 ))
     return cases
@@ -72,11 +74,16 @@ def evaluate_object_case(case: Case, test: RawResponse, baseline: RawResponse | 
     sev = bump(SEVERITY_BY_MODULE[case.module], False)
     if obs.kind == "transport_error":
         return Judgement("error", obs.kind, obs.detail)
+    if obs.kind in ("rejected", "rate_limited", "server_error", "redirect"):
+        return Judgement("inconclusive", obs.kind, f"{obs.detail}; the list was not evaluated")
     if not obs.allowed:
         return Judgement("pass", obs.kind, f"List not served to this identity ({obs.detail})")
     foreign_ids = {r.split(":", 1)[1] for r in case.extra["foreign"]}
     ids = collect_ids(test.json, case.extra["id_field"])
-    leaked = sorted(ids & foreign_ids)
+    rules = case.extra.get("match", {})
+    by_rules = {ref.split(":", 1)[1] for ref, m in rules.items() if jsonpath.any_node_matches(test.json, m)}
+    plain = {r.split(":", 1)[1] for r in case.extra["foreign"] if r not in rules}
+    leaked = sorted((ids & plain) | by_rules)
     if leaked:
         return Judgement("violation", obs.kind,
                          f"List response exposes {len(leaked)} object(s) this identity must not see: "

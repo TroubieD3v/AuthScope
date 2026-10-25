@@ -20,6 +20,7 @@ from .safety import BudgetExceeded, SafetyError
 
 class TestRunner:
     __test__ = False  # not a pytest class
+    MAX_TRANSPORT_STREAK = 8  # consecutive transport errors (after retries) that stop a run
 
     def __init__(
         self, cfg: ProjectConfig, secrets: SecretStore, project_id: str, modules: list[str],
@@ -39,6 +40,8 @@ class TestRunner:
         self._baselines: dict[tuple, RawResponse | None] = {}
         self._reset_failed = False
         self._login_tokens: dict[str, str] = {}  # obtained via login flows, this run only
+        self._transport_streak = 0
+        self.abort_reason: str | None = None
 
     def cancel(self) -> None:
         self.cancel_event.set()
@@ -77,6 +80,7 @@ class TestRunner:
                 await self._execute(c)
         finally:
             self.stats.requests = self.requester.budget.used
+            self.stats.retries, self.stats.backoff_s = self.requester.retries, round(self.requester.backoff_s, 1)
             await self.requester.aclose()
             self._progress()
         return self.results
@@ -190,6 +194,13 @@ class TestRunner:
         mod = self.stats.by_module.setdefault(result.module, {})
         mod[result.verdict] = mod.get(result.verdict, 0) + 1
         self.stats.requests = self.requester.budget.used
+        self.stats.retries, self.stats.backoff_s = self.requester.retries, round(self.requester.backoff_s, 1)
+        self._transport_streak = self._transport_streak + 1 if result.observed == "transport_error" else 0
+        if self._transport_streak >= self.MAX_TRANSPORT_STREAK and not self.abort_reason:
+            self.abort_reason = (f"target unavailable: {self._transport_streak} consecutive transport errors "
+                                 "after retries - run stopped")
+            self.warnings.append(self.abort_reason)
+            self.cancel_event.set()
         if self.on_result:
             self.on_result(result)
         self._progress()
@@ -208,7 +219,7 @@ class TestRunner:
             return self._result(case, Judgement("skipped", "skipped", reason))
 
         if self.cancel_event.is_set():
-            return skipped("run cancelled")
+            return skipped(self.abort_reason or "run cancelled")
         if case.skip_reason:
             return skipped(case.skip_reason)
         if case.endpoint.mutating and self._reset_failed:
@@ -238,6 +249,9 @@ class TestRunner:
         except SafetyError as exc:
             return self._result(case, Judgement("error", "transport_error", f"Blocked by safety rule: {exc}"))
 
+        if test.error:  # nothing to compare: the target did not answer (counts towards the abort streak)
+            return self._result(case, Judgement("error", "transport_error", test.error),
+                                Evidence(test=test.exchange(self.masker)))
         # A failed baseline makes the comparison meaningless for everyone but the owner.
         if baseline is not None and not same_as_baseline:
             bobs = classify(baseline)  # must simply be a successful, non-empty answer
@@ -254,7 +268,7 @@ class TestRunner:
     def _evidence(self, case: Case, j: Judgement, test: RawResponse, baseline: RawResponse | None) -> Evidence:
         res = case.resource
         obs = classify(test, baseline=baseline, id_field=res.id_field if res else "id",
-                       resource_id=res.id if res else None)
+                       resource_id=res.id if res else None, match=res.match if res else None)
         diff = j.diff or diff_summary(baseline, test, obs)
         repro = []
         if baseline is not None and case.baseline_identity:

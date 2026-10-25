@@ -22,7 +22,9 @@ export function Identities() {
   const [tokens, setTokens] = useState<Record<string, string>>({});
   const [ni, setNi] = useState({ name: "", role: "user", tenant: "", authType: "bearer", header: "X-API-Key", queryName: "api_key", username: "", loginPath: "", tokenPath: "access_token" });
   const [passwords, setPasswords] = useState<Record<string, string>>({});
-  const [nr, setNr] = useState({ type: "order", id: "", owner: "", tenant: "", parent: "" });
+  const [nr, setNr] = useState({ type: "order", id: "", owner: "", tenant: "", parent: "", match: "" });
+  const parseMatch = (txt: string) => Object.fromEntries(txt.split(";").map((p) => p.trim()).filter(Boolean)
+    .map((p) => { const i = p.lastIndexOf("="); return [p.slice(0, i).trim(), p.slice(i + 1).trim()]; }));
 
   const addIdentity = () => act(async () => {
     const anon = ni.authType === "none";
@@ -142,7 +144,7 @@ export function Identities() {
             <table className="w-full text-left text-sm">
               <thead className="text-[11px] uppercase tracking-[0.12em] text-mute"><tr>
                 <th className="px-4 py-3 font-semibold">Type</th><th className="font-semibold">Object id</th><th className="font-semibold">Owner</th>
-                <th className="font-semibold">Tenant</th><th className="font-semibold">Parent</th><th />
+                <th className="font-semibold">Tenant</th><th className="font-semibold">Parent</th><th className="font-semibold">Match rules</th><th />
               </tr></thead>
               <tbody>
                 {project.resources.map((r, idx) => (
@@ -152,6 +154,8 @@ export function Identities() {
                     <td>{r.owner ?? <span className="text-warn">no owner</span>}</td>
                     <td className="font-mono text-mute">{r.tenant ?? "(from owner)"}</td>
                     <td className="font-mono text-mute">{r.parent ?? "-"}</td>
+                    <td className="font-mono text-[11px] text-mute">{r.match && Object.keys(r.match).length
+                      ? Object.entries(r.match).map(([k, v]) => `${k} = ${v}`).join("; ") : "-"}</td>
                     <td className="pr-2 text-right"><Button size="icon" variant="ghost" onClick={() => saveResources(project.resources.filter((_, j) => j !== idx))}><Trash2 className="size-4" /></Button></td>
                   </tr>
                 ))}
@@ -165,9 +169,12 @@ export function Identities() {
               <option value="">-</option>{owners.map((o) => <option key={o.name}>{o.name}</option>)}</Select></Field>
             <Field label="Tenant"><Input value={nr.tenant} onChange={(e) => setNr({ ...nr, tenant: e.target.value })} /></Field>
             <Field label="Parent" hint="nested paths, e.g. user:1"><Input value={nr.parent} onChange={(e) => setNr({ ...nr, parent: e.target.value })} placeholder="user:1" /></Field>
+            <Field label="Match rules (optional)" hint="Composite ids: JSONPath=value; separated by ;" className="col-span-2 md:col-span-5">
+              <Input className="font-mono" value={nr.match} onChange={(e) => setNr({ ...nr, match: e.target.value })} placeholder="$.tenant=acme; $.number=101" />
+            </Field>
             <Button variant="accent" disabled={!nr.type || !nr.id} onClick={() => {
-              saveResources([...project.resources, { type: nr.type, id: nr.id, owner: nr.owner || null, tenant: nr.tenant || null, id_field: "id", parent: nr.parent || null }]);
-              setNr({ ...nr, id: "" });
+              saveResources([...project.resources, { type: nr.type, id: nr.id, owner: nr.owner || null, tenant: nr.tenant || null, id_field: "id", parent: nr.parent || null, match: parseMatch(nr.match) }]);
+              setNr({ ...nr, id: "", match: "" });
             }}><Plus className="size-4" /> Add object</Button>
           </CardBody>
         </Card>

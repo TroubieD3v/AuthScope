@@ -10,7 +10,7 @@ Verdict = Literal["pass", "violation", "needs_review", "inconclusive", "skipped"
 Severity = Literal["info", "low", "medium", "high", "critical"]
 Observed = Literal[
     "allowed_data", "allowed_empty", "allowed_ambiguous", "soft_denied", "denied",
-    "rejected", "redirect", "server_error", "transport_error", "skipped",
+    "rejected", "rate_limited", "redirect", "server_error", "transport_error", "skipped",
 ]
 SEVERITY_ORDER = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 VERDICT_ORDER = {"pass": 0, "skipped": 1, "inconclusive": 2, "needs_review": 3, "error": 4, "violation": 5}
@@ -72,6 +72,8 @@ class RunStats(BaseModel):
     total: int = 0
     done: int = 0
     requests: int = 0
+    retries: int = 0
+    backoff_s: float = 0.0
     by_verdict: dict[str, int] = Field(default_factory=dict)
     by_module: dict[str, dict[str, int]] = Field(default_factory=dict)
 

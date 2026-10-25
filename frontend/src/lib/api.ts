@@ -15,7 +15,7 @@ export interface Identity {
   password_source?: "runtime" | "env" | "missing" | null;
 }
 export interface Resource {
-  type: string; id: string; owner: string | null; tenant: string | null; id_field: string; label?: string | null; parent?: string | null;
+  type: string; id: string; owner: string | null; tenant: string | null; id_field: string; label?: string | null; parent?: string | null; match?: Record<string, string>;
 }
 export interface RestrictedField { name: string; roles: string[]; owner_can_see: boolean }
 export interface Endpoint {
@@ -38,7 +38,7 @@ export interface Project {
 export interface ProjectSummary { id: string; name: string; base_url: string; endpoints: number; updated_at: string }
 
 export interface RunStats {
-  total: number; done: number; requests: number;
+  total: number; done: number; requests: number; retries?: number; backoff_s?: number;
   by_verdict: Record<string, number>; by_module: Record<string, Record<string, number>>;
 }
 export interface Run {

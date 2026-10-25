@@ -347,7 +347,10 @@ def create_app(store: Store | None = None, secrets: SecretStore | None = None) -
             store.update_run(run)
             try:
                 await runner.run()
-                run.status = "cancelled" if runner.cancel_event.is_set() else "completed"
+                if runner.abort_reason:
+                    run.status, run.error = "failed", runner.abort_reason
+                else:
+                    run.status = "cancelled" if runner.cancel_event.is_set() else "completed"
             except Exception as exc:  # noqa: BLE001 - surfaced to the user
                 run.status, run.error = "failed", f"{type(exc).__name__}: {exc}"
             run.stats = runner.stats

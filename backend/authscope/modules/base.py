@@ -67,7 +67,7 @@ def bump(sev: Severity, mutating: bool) -> Severity:
 def observe(case: Case, test: RawResponse, baseline: RawResponse | None) -> Observation:
     res = case.resource
     obs = classify(test, baseline=baseline, id_field=res.id_field if res else "id",
-                   resource_id=res.id if res else None)
+                   resource_id=res.id if res else None, match=res.match if res else None)
     if case.endpoint.mutating and obs.kind in ("allowed_empty", "allowed_ambiguous"):
         obs = Observation("allowed_data", f"HTTP {test.status} - state-changing request accepted")
     return obs
@@ -81,7 +81,7 @@ def judge_access(case: Case, test: RawResponse, baseline: RawResponse | None) ->
 
     if k == "transport_error":
         return Judgement("error", k, obs.detail)
-    if k in ("rejected", "server_error", "redirect"):
+    if k in ("rejected", "rate_limited", "server_error", "redirect"):
         return Judgement("inconclusive", k, f"{obs.detail}; authorization was not actually evaluated")
 
     if case.expected == "deny":

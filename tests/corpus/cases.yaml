@@ -1,0 +1,90 @@
+# Annotated response corpus for compare.classify (#5).
+# Each case: the response a non-owner got, optionally the owner's baseline, the requested object,
+# and the classification AuthScope must produce. Changing a verdict here is a deliberate decision.
+#
+#   resource_id: requested object (omit for function-level checks)
+#   id_field / match: how the object is identified
+#   expected: denied | allowed_empty | soft_denied | allowed_data | allowed_ambiguous |
+#             rejected | rate_limited | redirect | server_error
+
+defaults:
+  owner_order: &owner_order '{"id": 101, "item": "Mechanical keyboard", "total": 129.9, "status": "paid", "shippingAddress": "12 Birch Lane"}'
+
+cases:
+  # --- explicit denials -------------------------------------------------------------------
+  - { name: 401 unauthorized, status: 401, body: '{"detail": "Authentication required"}', resource_id: "101", expected: denied }
+  - { name: 403 forbidden, status: 403, body: '{"detail": "Forbidden"}', resource_id: "101", expected: denied }
+  - { name: 404 hides the object, status: 404, body: '{"detail": "Not found"}', resource_id: "101", expected: denied }
+  - { name: redirect to login, status: 302, headers: { location: "/login?next=/orders/101" }, resource_id: "101", expected: denied }
+  - { name: redirect to SSO, status: 303, headers: { location: "https://sso.example.test/auth" }, resource_id: "101", expected: denied }
+
+  # --- not an authorization decision ------------------------------------------------------
+  - { name: redirect elsewhere, status: 302, headers: { location: "/orders" }, resource_id: "101", expected: redirect }
+  - { name: 400 bad request, status: 400, body: '{"detail": "bad id"}', resource_id: "101", expected: rejected }
+  - { name: 422 validation error, status: 422, body: '{"detail": [{"loc": ["path"], "msg": "x"}]}', resource_id: "101", expected: rejected }
+  - { name: 418 unusual 4xx, status: 418, body: "teapot", resource_id: "101", expected: rejected }
+  - { name: 429 rate limited, status: 429, headers: { retry-after: "5" }, resource_id: "101", expected: rate_limited }
+  - { name: 500 server error, status: 500, body: "Internal Server Error", resource_id: "101", expected: server_error }
+  - { name: 503 html error page, status: 503, body: "<html><body>maintenance</body></html>", resource_id: "101", expected: server_error }
+
+  # --- 200 without data -----------------------------------------------------------------
+  - { name: empty body, status: 200, body: "", resource_id: "101", expected: allowed_empty }
+  - { name: whitespace body, status: 200, body: "  \n ", resource_id: "101", expected: allowed_empty }
+  - { name: 204 no content, status: 204, body: "", resource_id: "101", expected: allowed_empty }
+  - { name: empty array, status: 200, body: "[]", resource_id: "101", expected: allowed_empty }
+  - { name: empty object, status: 200, body: "{}", resource_id: "101", expected: allowed_empty }
+  - { name: json null, status: 200, body: "null", resource_id: "101", expected: allowed_empty }
+  - { name: pagination wrapper without items, status: 200, body: '{"items": [], "total": 0, "page": 1, "per_page": 20}', resource_id: "101", expected: allowed_empty }
+  - { name: pagination wrapper with next cursor, status: 200, body: '{"data": [], "next": null, "has_more": false, "limit": 50}', resource_id: "101", expected: allowed_empty }
+
+  # --- 200 that is really a refusal --------------------------------------------------------
+  - { name: error key, status: 200, body: '{"error": "forbidden"}', resource_id: "101", expected: soft_denied }
+  - { name: success false, status: 200, body: '{"success": false, "message": "not allowed"}', resource_id: "101", expected: soft_denied }
+  - { name: status error word, status: 200, body: '{"status": "denied", "message": "no access"}', resource_id: "101", expected: soft_denied }
+  - { name: numeric code in body, status: 200, body: '{"code": 403, "message": "Forbidden"}', resource_id: "101", expected: soft_denied }
+  - { name: graphql errors, status: 200, body: '{"data": null, "errors": [{"message": "Not authorized"}]}', resource_id: "101", expected: soft_denied }
+  - { name: html login page with 200, status: 200, body: '<html><body><form action="/login" method="post"><input name="user"><input type="password" name="pw"></form></body></html>', resource_id: "101", expected: soft_denied }
+
+  # --- the same object (confirmed) --------------------------------------------------------
+  - { name: identical object, status: 200, body: *owner_order, baseline: *owner_order, resource_id: "101", expected: allowed_data }
+  - { name: id as string, status: 200, body: '{"id": "101", "item": "Mechanical keyboard", "total": 129.9}', baseline: *owner_order, resource_id: "101", expected: allowed_data }
+  - name: same object in a wrapper
+    status: 200
+    body: '{"data": {"order": {"id": 101, "item": "Mechanical keyboard", "total": 129.9, "status": "paid"}}}'
+    baseline: *owner_order
+    resource_id: "101"
+    expected: allowed_data
+  - { name: custom id field, status: 200, body: '{"orderId": "A-7", "item": "desk", "total": 599}', baseline: '{"orderId": "A-7", "item": "desk", "total": 599}', resource_id: "A-7", id_field: orderId, expected: allowed_data }
+  - { name: id match without baseline, status: 200, body: '{"id": 101, "item": "x"}', resource_id: "101", expected: allowed_data }
+  - name: composite identifier
+    status: 200
+    body: '{"tenant": "acme", "number": 101, "item": "keyboard"}'
+    baseline: '{"tenant": "acme", "number": 101, "item": "keyboard"}'
+    resource_id: "acme/101"
+    match: { "$.tenant": "acme", "$.number": "101" }
+    expected: allowed_data
+
+  # --- look-alikes and coincidences (must NOT be confirmed) -------------------------------
+  - name: different order with the same typical fields
+    status: 200
+    body: '{"id": 102, "item": "Mechanical keyboard", "total": 129.9, "status": "paid", "shippingAddress": "12 Birch Lane"}'
+    baseline: *owner_order
+    resource_id: "101"
+    expected: allowed_ambiguous
+  - { name: id appears with unrelated data, status: 200, body: '{"id": 101, "kind": "coupon", "code": "SPRING"}', baseline: *owner_order, resource_id: "101", expected: allowed_ambiguous }
+  - { name: caller's own object instead, status: 200, body: '{"id": 102, "item": "Monitor", "total": 349}', baseline: *owner_order, resource_id: "101", expected: allowed_ambiguous }
+  - { name: id only as a foreign key, status: 200, body: '{"id": 9, "orderId": 101, "note": "refund"}', baseline: *owner_order, resource_id: "101", expected: allowed_ambiguous }
+  - name: composite identifier from another tenant
+    status: 200
+    body: '{"tenant": "globex", "number": 101, "item": "keyboard"}'
+    baseline: '{"tenant": "acme", "number": 101, "item": "keyboard"}'
+    resource_id: "acme/101"
+    match: { "$.tenant": "acme", "$.number": "101" }
+    expected: allowed_ambiguous
+  - { name: truncated json, status: 200, body: '{"id": 101, "item": "Mechanical keyb', baseline: *owner_order, resource_id: "101", expected: allowed_ambiguous }
+  - { name: plain text mentioning the id, status: 200, body: "order 101 exists", resource_id: "101", expected: allowed_ambiguous }
+
+  # --- function-level (no object) ---------------------------------------------------------
+  - { name: admin function returns data, status: 200, body: '{"users": 4, "orders": 3}', expected: allowed_data }
+  - { name: admin function error body, status: 200, body: '{"error": "admin only"}', expected: soft_denied }
+  - { name: admin function empty, status: 200, body: "[]", expected: allowed_empty }

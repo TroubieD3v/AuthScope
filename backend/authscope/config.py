@@ -36,6 +36,8 @@ class TargetConfig(BaseModel):
     timeout_s: float = Field(default=10.0, gt=0, le=120)
     concurrency: int = Field(default=1, ge=1, le=8)
     max_redirects: int = Field(default=0, ge=0, le=5)
+    max_retries: int = Field(default=3, ge=0, le=10)  # 429s for any request; transport errors only for reads
+    retry_after_cap_s: float = Field(default=30.0, gt=0, le=300)  # longer Retry-After values are not waited for
     allow_mutating: bool = False
     acknowledge_no_reset: bool = False
     reset: ResetConfig | None = None
@@ -161,11 +163,25 @@ class Resource(BaseModel):
     id_field: str = "id"
     label: str | None = None
     parent: str | None = None  # "user:1" - fills the parent segment of nested paths
+    # Composite / custom identification: JSONPath -> expected value. When set, a response "contains this
+    # object" only if every rule matches (instead of looking for id_field == id).
+    match: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("id", mode="before")
     @classmethod
     def _id_str(cls, v: Any) -> str:
         return str(v)
+
+    @field_validator("match", mode="before")
+    @classmethod
+    def _match(cls, v: Any) -> Any:
+        from .jsonpath import parse
+
+        if isinstance(v, dict):
+            for expr in v:
+                parse(expr)  # raises with a readable message on unsupported syntax
+            return {k: str(val) for k, val in v.items()}
+        return v
 
     @property
     def ref(self) -> str:

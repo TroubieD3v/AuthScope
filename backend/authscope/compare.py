@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Iterator
 
+from . import jsonpath
 from .http_engine import RawResponse
 from .models import Observed
 
@@ -46,10 +47,25 @@ def informative(v: Any) -> bool:
     return not (v is None or v is False or v == 0 or (isinstance(v, str) and not v.strip()))
 
 
+PAGINATION_KEYS = {"total", "count", "page", "pages", "page_size", "pagesize", "per_page", "perpage", "limit",
+                   "offset", "next", "previous", "prev", "cursor", "has_more", "hasmore", "total_count", "totalcount"}
+LOGIN_PAGE = re.compile(r"<form[^>]*>.*?(type=[\"']?password|name=[\"']?password)", re.I | re.S)
+
+
 def is_empty_payload(data: Any, text: str) -> bool:
     if data is None:
         return not text.strip() or text.strip() == "null"
+    if isinstance(data, dict) and any(isinstance(v, list) for v in data.values()):
+        # a pagination wrapper with only empty lists is empty, whatever its counters say
+        lists_empty = all(not v for v in data.values() if isinstance(v, list))
+        others = {k for k, v in data.items() if not isinstance(v, list)}
+        if lists_empty and all(_norm(k) in PAGINATION_KEYS or not informative(data[k]) for k in others):
+            return True
     return not any(informative(v) for _, v in leaves(data))
+
+
+def is_login_page(data: Any, text: str) -> bool:
+    return data is None and bool(LOGIN_PAGE.search(text[:20000]))
 
 
 def is_error_envelope(data: Any) -> bool:
@@ -120,8 +136,17 @@ def find_fields(data: Any, name: str) -> list[str]:
 
 
 # -- classification -----------------------------------------------------------------------
+def identifies(data: Any, *, id_field: str, resource_id: str | None, match: dict[str, str] | None) -> bool:
+    """Does the document contain the requested object? Match rules win over the plain id field."""
+    if data is None or not resource_id:
+        return False
+    if match:
+        return jsonpath.matches(data, match) or jsonpath.any_node_matches(data, match)
+    return find_id(data, id_field, resource_id)
+
+
 def classify(resp: RawResponse, *, baseline: RawResponse | None = None, id_field: str = "id",
-             resource_id: str | None = None) -> Observation:
+             resource_id: str | None = None, match: dict[str, str] | None = None) -> Observation:
     if resp.error:
         return Observation("transport_error", resp.error)
     s = resp.status or 0
@@ -132,7 +157,9 @@ def classify(resp: RawResponse, *, baseline: RawResponse | None = None, id_field
         if any(h in loc.lower() for h in LOGIN_HINTS):
             return Observation("denied", f"HTTP {s} redirect to login ({loc})")
         return Observation("redirect", f"HTTP {s} redirect to {loc or '?'} (not followed)")
-    if s in REJECTED_STATUS:
+    if s == 429:
+        return Observation("rate_limited", "HTTP 429 - rate limited even after retries")
+    if s in REJECTED_STATUS or 400 <= s < 500:
         return Observation("rejected", f"HTTP {s} - request rejected before an authorization decision")
     if s >= 500 or s < 200:
         return Observation("server_error", f"HTTP {s}")
@@ -140,10 +167,12 @@ def classify(resp: RawResponse, *, baseline: RawResponse | None = None, id_field
     data = resp.json
     if is_empty_payload(data, resp.text):
         return Observation("allowed_empty", f"HTTP {s} with empty payload")
-    if is_error_envelope(data) and not (resource_id and find_id(data, id_field, resource_id)):
+    if is_login_page(data, resp.text):
+        return Observation("soft_denied", f"HTTP {s} with a login form instead of data")
+    id_match = identifies(data, id_field=id_field, resource_id=resource_id, match=match)
+    if is_error_envelope(data) and not id_match:
         return Observation("soft_denied", f"HTTP {s} but body is an error envelope")
 
-    id_match = bool(resource_id) and data is not None and find_id(data, id_field, resource_id)
     overlap, shared, corroboration = None, [], None
     if baseline is not None and baseline.json is not None and data is not None:
         base_leaves = {(p, repr(v)) for p, v in leaves(baseline.json) if informative(v)}
@@ -153,8 +182,13 @@ def classify(resp: RawResponse, *, baseline: RawResponse | None = None, id_field
             overlap = len(common) / len(base_leaves)
             shared = sorted(p for p, _ in common)
             # corroboration ignores the id itself: an id match must be backed by other identical fields
-            not_id = {x for x in base_leaves if x[0].split(".")[-1].rstrip("[]") != id_field}
-            corroboration = len(not_id & test_leaves) / len(not_id) if not_id else None
+            id_keys = {id_field} | {k for k in (jsonpath.last_key(e) for e in (match or {})) if k}
+            # compared by (field name, value) so the same object in a different wrapper still corroborates
+            def keyed(items):
+                return {(path.split(".")[-1].replace("[]", ""), value) for path, value in items}
+            base_kv, test_kv = keyed(base_leaves), keyed(test_leaves)
+            not_id = {x for x in base_kv if x[0] not in id_keys}
+            corroboration = len(not_id & test_kv) / len(not_id) if not_id else None
     if resource_id is None:
         # function-level checks: there is no object to identify, data itself is the access
         if overlap is not None and overlap >= SIMILAR_OVERLAP:
@@ -167,7 +201,8 @@ def classify(resp: RawResponse, *, baseline: RawResponse | None = None, id_field
     # can share status, item and total - so it goes to manual review instead.
     if id_match and (corroboration is None or corroboration >= MIN_CORROBORATION):
         extra = f" and {overlap:.0%} of the owner's fields" if overlap is not None else ""
-        return Observation("allowed_data", f"HTTP {s}; response contains object id {resource_id}{extra}",
+        what = "all match rules of " + resource_id if match else "object id " + resource_id
+        return Observation("allowed_data", f"HTTP {s}; response contains {what}{extra}",
                            overlap, True, shared)
     if id_match:
         return Observation("allowed_ambiguous",

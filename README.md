@@ -151,6 +151,17 @@ tests:
   - { name: Cross-user order access, path: /api/orders/101, identity: bob, expected: deny, baseline_identity: alice }
 ```
 
+Objects without a single id field can be identified by JSONPath rules (composite identifiers); a response then
+"contains the object" only when every rule matches, and look-alikes stay in *needs review*:
+
+```yaml
+resources:
+  - type: order
+    id: acme/101
+    owner: alice
+    match: { "$.tenant": acme, "$.number": "101" }   # supported: .key ['key'] [0] [*] ..key
+```
+
 Full example: [examples/demo.authscope.yaml](examples/demo.authscope.yaml). Add `openapi: ./spec.yaml` or
 `postman: ./collection.json` to merge endpoints from a file. The `authz-gate` job in
 [ci.yml](.github/workflows/ci.yml) shows AuthScope as an authorization regression gate.
@@ -161,7 +172,9 @@ Full example: [examples/demo.authscope.yaml](examples/demo.authscope.yaml). Add 
 - Each host is resolved once per request, the address is validated, and the connection goes to exactly that address
   (DNS pinning; Host header and TLS name kept). Link-local and cloud-metadata ranges are always blocked; redirects
   are not followed by default.
-- 5 requests/s and a 500-request budget per run by default.
+- 5 requests/s and a 500-request budget per run by default. `429 Too Many Requests` is retried after `Retry-After`
+  (capped, within the budget); timeouts and connection errors are retried only for read-only requests, never for
+  writes. After 8 consecutive unreachable responses the run stops and says the target is unavailable.
 - Read-only by default. State-changing tests need an explicit switch and a reset endpoint that runs after every write.
 - Secrets are never stored in the config, the database or reports; evidence is masked.
 - The service binds to `127.0.0.1` and rejects foreign `Host` headers.
@@ -169,15 +182,24 @@ Full example: [examples/demo.authscope.yaml](examples/demo.authscope.yaml). Add 
 ## Tests
 
 ```bash
-pytest                                  # 53 tests: engine, modules, imports, API, CLI, against the demo API
+pytest                                  # engine, modules, imports, API, CLI, corpus and property tests
 playwright install chromium
 pytest -m e2e                           # browser test of the full UI workflow
 python scripts/screenshots.py           # regenerate the screenshots in this README
 ```
 
 The demo API plants one flaw per module and can be switched to a fully secure mode (`DEMO_VULNS=`). The suite
-proves that every planted flaw is found **and** that the secure variant produces zero findings. CI also builds the
-Docker image and runs the browser test.
+proves that every planted flaw is found **and** that the secure variant produces zero findings.
+
+- `tests/corpus/cases.yaml`: 40+ annotated tricky responses (look-alike objects, ids in wrappers, pagination
+  wrappers, GraphQL errors, HTML login pages with 200, truncated JSON...) with the verdict each must get.
+- Property-based tests (Hypothesis): a 200 without the requested id is never a confirmed violation, the
+  classifier never crashes, and a known secret never survives masking wherever it is placed.
+- `scripts/ci_gate.py` runs in CI against a secure and a vulnerable demo: zero findings on one, exactly the
+  expected list ([examples/expected-findings.json](examples/expected-findings.json)) on the other, evidence that
+  points at the reported object, and no credentials in any report format.
+
+CI also builds the Docker image and runs the browser test.
 
 ## Architecture
 
@@ -207,7 +229,8 @@ Mass Assignment and Session Authorization modules, and a Burp Suite extension, a
 | v1.0.0 | Five modules, baseline comparison, evidence and reports, OpenAPI and Postman import, login flow, web UI, CLI, Docker |
 | v1.1.0 | API key and HTTP Basic auth, nested object paths, screenshots, docs, issue and PR templates |
 | v1.2.0 | Stricter comparison (object id required for a violation), DNS pinning, repository renamed to AuthScope |
-| **v1.3.0** | **Redesigned interface: dark theme by default with a light theme switch, new palette and typography, redesigned HTML report** |
+| v1.3.0 | Redesigned interface: dark theme by default with a light theme switch, new palette and typography, redesigned HTML report |
+| **v1.4.0** | **Two-sided CI gate, false-positive corpus and property tests, 429/retry handling, composite identifiers via JSONPath** |
 
 ## License
 
