@@ -135,7 +135,7 @@ class Requester:
         self._resolve = resolve_secret
         self._client = httpx.AsyncClient(
             timeout=target.timeout_s, follow_redirects=False, verify=target.verify_tls,
-            trust_env=False, headers={"User-Agent": "AuthScope/1.2 (authorization tester)"},
+            trust_env=False, headers={"User-Agent": "AuthScope/1.3 (authorization tester)"},
         )
 
     async def aclose(self) -> None:

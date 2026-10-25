@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0
+
+- Redesigned web interface in an editorial, bento-grid style: large headlines with status pills, a two-ring dial on
+  the dashboard, stat tiles, module toggle cards in the Test Runner, identity cards, square controls and pill
+  switches.
+- Dark theme by default, with a light theme switch in the top bar (remembered per browser, no flash on load).
+- New palette: primary `#121212`, secondary `#008542`, tertiary `#D97706`, neutral `#64748B`; Manrope for headlines,
+  Inter for body text, JetBrains Mono for code. Fonts are bundled with the UI, no CDN requests.
+- Responsive layout: side rail on desktop, bottom navigation on mobile.
+- HTML report restyled with the same palette, dark by default with a light/dark switch.
+- Screenshots and demo GIF regenerated, including light-theme views.
+
 ## 1.2.0
 
 - Comparison: an object-level violation now requires the requested object's id in the response, corroborated by

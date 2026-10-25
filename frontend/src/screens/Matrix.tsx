@@ -43,8 +43,8 @@ export function Matrix() {
   if (!m) return <div className="text-mute">Loading...</div>;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Permission Matrix"
+    <div className="space-y-10">
+      <PageHeader kicker={m.run_id ? "Verified by run " + m.run_id : "Expected access"} kickerTone={m.run_id ? "accent" : "mute"} title="Permission Matrix"
         hint={m.run_id ? `Expected access (from your rules) overlaid with the results of run ${m.run_id}.` : "Expected access derived from endpoint rules. Run a test to overlay real results."} />
       <Card>
         <CardHeader title="Authorization matrix" hint="Click a cell to override the expectation (allow -> deny -> back to the derived rule)." />
@@ -74,7 +74,7 @@ export function Matrix() {
                       <td key={i.name} className="p-1 text-center">
                         <button disabled={!r.enabled} onClick={() => cycle(r.endpoint, i.name, c)}
                           title={`${e.title}${c.overridden ? " (manual override)" : ""}\n${tested.map(([k, n]) => `${k}: ${n}`).join(", ") || "not tested yet"}`}
-                          className={cn("relative h-11 w-full min-w-[84px] cursor-pointer rounded-md text-xs font-medium transition hover:brightness-125", cellStyle(c))}>
+                          className={cn("relative h-11 w-full min-w-[84px] cursor-pointer rounded-[3px] text-xs font-semibold transition hover:brightness-110", cellStyle(c))}>
                           <span className={e.cls}>{e.sym}</span>
                           {c.worst === "violation" && <span className="block text-[10px] font-semibold text-bad">VIOLATION</span>}
                           {c.worst === "needs_review" && <span className="block text-[10px] font-semibold text-warn">REVIEW</span>}

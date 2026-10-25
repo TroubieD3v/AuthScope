@@ -35,6 +35,12 @@ Alice, вопреки настроенной политике»* — с обои
 |---|---|
 | ![Findings & Reports](docs/screenshots/findings.png) | ![Dashboard](docs/screenshots/dashboard.png) |
 
+По умолчанию тема тёмная; переключатель в верхней панели включает светлую (выбор запоминается в браузере).
+
+| Светлая тема: Dashboard | Светлая тема: матрица доступа |
+|---|---|
+| ![Dashboard, светлая тема](docs/screenshots/dashboard-light.png) | ![Матрица доступа, светлая тема](docs/screenshots/matrix-light.png) |
+
 ## Проверки
 
 Пять модулей покрывают категории авторизации из
@@ -84,7 +90,8 @@ Test      bob   -> GET /api/orders/101   ?
 6. **Запуск**: матрица, находки и отчёты (HTML, Markdown, JSON, pytest).
 
 В интерфейсе шесть экранов: Dashboard, API Explorer, Identity Manager, Permission Matrix, Test Runner и
-Findings & Reports.
+Findings & Reports, в тёмной (по умолчанию) и светлой теме. Палитра: primary `#121212`, secondary `#008542`,
+tertiary `#D97706`, neutral `#64748B`; заголовки — Manrope, текст — Inter (шрифты встроены, без CDN).
 
 | API Explorer | Identity Manager |
 |---|---|
@@ -205,7 +212,8 @@ python scripts/screenshots.py           # перегенерировать ск�
 |---|---|
 | v1.0.0 | Пять модулей, сравнение с baseline, доказательства и отчёты, импорт OpenAPI и Postman, вход через login-эндпоинт, веб-интерфейс, CLI, Docker |
 | v1.1.0 | API-ключ в query и HTTP Basic, вложенные пути объектов, скриншоты, документация, шаблоны issue и PR |
-| **v1.2.0** | **Строже сравнение (для нарушения нужен id объекта), DNS pinning, репозиторий переименован в AuthScope** |
+| v1.2.0 | Строже сравнение (для нарушения нужен id объекта), DNS pinning, репозиторий переименован в AuthScope |
+| **v1.3.0** | **Новый дизайн интерфейса: тёмная тема по умолчанию с переключателем на светлую, новая палитра и шрифты, обновлённый HTML-отчёт** |
 
 ## Лицензия
 

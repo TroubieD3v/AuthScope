@@ -40,6 +40,12 @@ def serve(app, preferred: int = 0) -> str:
     return f"http://127.0.0.1:{port}"
 
 
+def settle(page: Page) -> None:
+    """Park the mouse and let hover/colour transitions finish before a capture."""
+    page.mouse.move(VIEWPORT["width"] - 5, VIEWPORT["height"] - 5)
+    time.sleep(0.45)
+
+
 def frame(page: Page, frames: list[Image.Image], hold: int = 1) -> None:
     img = Image.open(io.BytesIO(page.screenshot())).convert("RGB").resize((1080, 675), Image.LANCZOS)
     frames.extend([img] * hold)
@@ -59,9 +65,10 @@ def main() -> None:
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
-        page = browser.new_page(viewport=VIEWPORT, color_scheme="dark")
+        page = browser.new_page(viewport=VIEWPORT, color_scheme="dark")  # app default is dark anyway
         page.goto(ui)
         page.get_by_label("Demo API address").fill(demo)
+        settle(page)
         page.screenshot(path=OUT / "onboarding.png")
         page.get_by_role("button", name="Load demo project").click()
         page.get_by_text("Test identities").wait_for()
@@ -74,20 +81,37 @@ def main() -> None:
             time.sleep(0.35)
             frame(page, frames)
         page.get_by_role("button", name="Open findings").wait_for(timeout=30_000)
-        page.mouse.wheel(0, 600)
-        time.sleep(0.3)
+        settle(page)
         frame(page, frames, 4)
+        settle(page)
         page.screenshot(path=OUT / "runner.png")
 
         page.get_by_role("button", name="Dashboard").click()
         page.get_by_text("Results by module").wait_for()
-        time.sleep(0.4)
+        time.sleep(0.9)
+        settle(page)
         page.screenshot(path=OUT / "dashboard.png")
+        # the same screen in the light theme, then back to the default dark theme
+        page.get_by_role("button", name="Switch to light theme").click()
+        time.sleep(0.5)
+        settle(page)
+        page.screenshot(path=OUT / "dashboard-light.png")
+        page.get_by_role("button", name="Permission Matrix").click()
+        page.get_by_text("VIOLATION").first.wait_for()
+        time.sleep(0.3)
+        settle(page)
+        page.screenshot(path=OUT / "matrix-light.png")
+        page.get_by_role("button", name="Switch to dark theme").click()
+        page.get_by_role("button", name="Dashboard").click()
+        page.get_by_text("Results by module").wait_for()
+        time.sleep(0.9)
+        frame(page, frames, 6)
 
         page.get_by_role("button", name="Permission Matrix").click()
         page.get_by_text("VIOLATION").first.wait_for()
         time.sleep(0.3)
         frame(page, frames, 8)
+        settle(page)
         page.screenshot(path=OUT / "matrix.png")
 
         page.get_by_role("button", name="Findings & Reports").click()
@@ -96,17 +120,20 @@ def main() -> None:
         row.scroll_into_view_if_needed()
         row.click()
         page.get_by_text("Expected policy", exact=True).wait_for()
-        row.evaluate("e => e.closest('button').scrollIntoView({block: 'start'})")
+        row.evaluate("e => { e.closest('button').scrollIntoView({block: 'start'}); window.scrollBy(0, -84); }")
         time.sleep(0.3)
         frame(page, frames, 10)
+        settle(page)
         page.screenshot(path=OUT / "findings.png")
 
         page.get_by_role("button", name="API Explorer").click()
         page.get_by_text("Endpoints (").wait_for()
+        settle(page)
         page.screenshot(path=OUT / "explorer.png")
 
         page.get_by_role("button", name="Identity Manager").click()
         page.get_by_text("Test objects and their owners").wait_for()
+        settle(page)
         page.screenshot(path=OUT / "identities.png")
         browser.close()
 

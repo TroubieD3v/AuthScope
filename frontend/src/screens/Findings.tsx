@@ -65,8 +65,8 @@ export function Findings() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Findings & Reports" hint="Evidence with masked tokens, response differences, the expected policy and a reproduction command."
+    <div className="space-y-10">
+      <PageHeader kicker={counts.findings ? `${counts.findings} to fix or review` : "Evidence"} kickerTone={counts.findings ? "bad" : "accent"} title="Findings & Reports" hint="Both requests side by side, the response differences, the expected policy and a curl to reproduce it. Tokens are masked."
         actions={rid && (
           <>
             {(["html", "md", "json", "pytest"] as const).map((f) => (
@@ -91,10 +91,10 @@ export function Findings() {
             <GitCompare className="size-3.5" /> Compare with {previous.id}
           </Button>
         )}
-        <div className="ml-auto flex gap-1 rounded-lg border border-line bg-panel p-1">
+        <div className="ml-auto flex gap-1 rounded-[3px] bg-panel2 p-1">
           {(["findings", "passed", "other"] as Tab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`cursor-pointer rounded-md px-3 py-1 text-xs font-medium ${tab === t ? "bg-accent/15 text-accent" : "text-mute hover:text-ink"}`}>
+              className={`cursor-pointer rounded-[3px] px-3 py-1.5 text-xs font-semibold ${tab === t ? "bg-primary text-on-primary" : "text-mute hover:text-ink"}`}>
               {t === "findings" ? "Findings" : t === "passed" ? "Passed" : "Inconclusive / skipped"} <span className="font-mono">{counts[t]}</span>
             </button>
           ))}
@@ -104,7 +104,7 @@ export function Findings() {
       {diff && (
         <Card>
           <CardHeader title="Regression: compared with previous run" actions={<Button size="sm" variant="ghost" onClick={() => setDiff(null)}>Close</Button>} />
-          <div className="grid grid-cols-3 divide-x divide-line text-sm">
+          <div className="grid grid-cols-3 divide-x divide-line/60 text-sm">
             {([["New", diff.new, "text-bad"], ["Fixed", diff.fixed, "text-ok"], ["Unchanged", diff.unchanged, "text-mute"]] as const).map(([t, list, cls]) => (
               <div key={t} className="p-4">
                 <div className={`mb-2 font-mono text-2xl ${cls}`}>{list.length}</div>
@@ -116,7 +116,7 @@ export function Findings() {
         </Card>
       )}
 
-      <Card className="divide-y divide-line">
+      <Card className="divide-y divide-line/60">
         {rid && view.length === 0 && (
           <p className="px-5 py-8 text-center text-sm text-mute">{tab === "findings" ? "No violations - everything matches the policy." : "Nothing here."}</p>
         )}
@@ -163,7 +163,7 @@ function EvidenceView({ r }: { r: CheckResult }) {
             <span className="text-xs font-semibold uppercase tracking-wider text-mute">Reproduce (tokens come from env variables)</span>
             <Button size="sm" variant="ghost" onClick={() => copy(ev.reproduction.join("\n\n"))}><Copy className="size-3" /> Copy</Button>
           </div>
-          <pre className="overflow-x-auto rounded-md border border-line bg-bg p-3 text-[11px] leading-relaxed">{ev.reproduction.join("\n\n")}</pre>
+          <pre className="overflow-x-auto rounded-2xl bg-bg ring-1 ring-line/60 p-3 text-[11px] leading-relaxed">{ev.reproduction.join("\n\n")}</pre>
         </div>
       )}
     </div>
@@ -180,10 +180,10 @@ function Exchange({ title, ex }: { title: string; ex: Exchange }) {
         <Badge tone={tone}>{ex.status ?? "ERR"}</Badge>
         <span className="text-mute">{ex.elapsed_ms} ms</span>
       </div>
-      <pre className="mb-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md border border-line bg-bg p-2.5 text-[11px]">
+      <pre className="mb-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-2xl bg-bg ring-1 ring-line/60 p-2.5 text-[11px]">
         {ex.method} {ex.url}{Object.entries(ex.request_headers).map(([k, v]) => `\n${k}: ${v}`).join("")}{ex.request_body ? `\n\n${ex.request_body}` : ""}
       </pre>
-      <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-all rounded-md border border-line bg-bg p-2.5 text-[11px]">{ex.error ?? ex.response_body ?? "(empty body)"}</pre>
+      <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-all rounded-2xl bg-bg ring-1 ring-line/60 p-2.5 text-[11px]">{ex.error ?? ex.response_body ?? "(empty body)"}</pre>
     </div>
   );
 }

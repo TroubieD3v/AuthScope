@@ -1,47 +1,65 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="en" class="dark"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AuthScope report - {{ d.project }}</title>
 <style>
- :root{--bg:#0f1419;--panel:#171d25;--line:#2a3340;--text:#e6edf3;--mute:#8b98a8;--bad:#ff6b6b;--warn:#f5b041;--ok:#4cc38a;}
- *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,Segoe UI,sans-serif}
- main{max-width:980px;margin:0 auto;padding:32px 20px 80px} h1{margin:0 0 4px} h2{margin-top:36px;border-bottom:1px solid var(--line);padding-bottom:6px}
- .mute{color:var(--mute)} .cards{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
- .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:130px}
- .card b{display:block;font-size:26px}
- .finding{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--bad);border-radius:8px;padding:14px 16px;margin:14px 0}
- .finding.needs_review{border-left-color:var(--warn)}
- .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;background:#2a3340;margin-right:6px}
- .tag.violation{background:#4a1f24;color:#ffb3b3}.tag.needs_review{background:#4a3a14;color:#ffd699}
- pre{background:#0b0f14;border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;font-size:12px;white-space:pre-wrap;word-break:break-word}
- table{border-collapse:collapse;width:100%} td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
- details{margin:8px 0} summary{cursor:pointer;color:var(--mute)}
- .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:800px){.cols{grid-template-columns:1fr}}
+ :root{--bg:#f4f7fc;--panel:#fff;--panel2:#e8effa;--line:#d3dceb;--text:#121212;--mute:#64748b;--bad:#c62828;--warn:#b45f06;--ok:#008542;--code:#eef3fb;--inv:#1e293b}
+ .dark{--bg:#0d0d0e;--panel:#161617;--panel2:#1d1e20;--line:#2e3033;--text:#f3f3f2;--mute:#94a3b8;--bad:#f2716b;--warn:#f59a3c;--ok:#3fbf75;--code:#0d0d0e;--inv:#233046}
+ *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 Inter,system-ui,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+ main{max-width:1040px;margin:0 auto;padding:40px 24px 80px}
+ h1,h2,h3,.num{font-family:Manrope,Inter,system-ui,sans-serif;letter-spacing:-.02em}
+ h1{font-size:44px;line-height:1;margin:14px 0 10px;font-weight:600} h2{font-size:24px;margin:48px 0 16px}
+ .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px}
+ .brand{display:flex;align-items:center;gap:10px;font:700 18px Manrope,Inter,sans-serif}
+ .mark{width:34px;height:34px;border-radius:3px;background:var(--text);color:var(--bg);display:grid;place-items:center;font-size:16px}
+ .toggle{cursor:pointer;border:0;background:var(--panel2);color:var(--text);border-radius:3px;padding:8px 12px;font:600 12px Inter,sans-serif}
+ .mute{color:var(--mute)}
+ .pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--panel2);color:var(--mute);margin-right:6px}
+ .pill.violation,.pill.bad{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+ .pill.needs_review,.pill.warn{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
+ .pill.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+ .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:28px 0}
+ .card{background:var(--panel2);border-radius:18px;padding:18px 20px}
+ .card .lbl{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+ .card .num{display:block;font-size:34px;font-weight:700;margin-top:6px}
+ .finding{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:22px 24px;margin:16px 0}
+ .finding h3{margin:10px 0 2px;font-size:18px}
+ pre{background:var(--code);border:1px solid var(--line);border-radius:14px;padding:12px;overflow:auto;font:12px/1.5 "JetBrains Mono",ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+ .xlbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:14px 0 6px}
+ table{border-collapse:collapse;width:100%;background:var(--panel);border-radius:18px;overflow:hidden} td,th{border-bottom:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+ th{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+ details{margin:10px 0} summary{cursor:pointer;color:var(--mute);font-weight:600}
+ .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.cols,.cards{grid-template-columns:1fr 1fr}}
+ code{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace}
 </style></head><body><main>
-<h1>AuthScope report</h1>
+<div class="top"><div class="brand"><div class="mark">&#x2713;</div>AuthScope</div>
+<button class="toggle" onclick="document.documentElement.classList.toggle('dark')">Light / dark</button></div>
+{% set v = d.summary.verdicts %}
+<span class="pill {{ 'bad' if v.get('violation',0) else 'ok' }}">{{ 'Action needed' if v.get('violation',0) else 'Policy holds' }}</span>
+<h1>Authorization report</h1>
 <div class="mute">{{ d.project }} &middot; target <code>{{ d.target }}</code> &middot; run <code>{{ d.run.id }}</code> ({{ d.run.status }}) &middot; {{ d.run.started_at }}</div>
 <p class="mute">Tokens and sensitive values are masked. Reproduction commands read tokens from environment variables.</p>
 {% for w in d.warnings %}<p style="color:var(--warn)">Warning: {{ w }}</p>{% endfor %}
-{% set v = d.summary.verdicts %}
 <div class="cards">
- <div class="card"><b style="color:var(--bad)">{{ v.get('violation',0) }}</b>violations</div>
- <div class="card"><b style="color:var(--warn)">{{ v.get('needs_review',0) }}</b>need review</div>
- <div class="card"><b style="color:var(--ok)">{{ v.get('pass',0) }}</b>passed</div>
- <div class="card"><b>{{ v.get('inconclusive',0) + v.get('skipped',0) + v.get('error',0) }}</b>inconclusive / skipped</div>
+ <div class="card"><span class="lbl">Violations</span><span class="num" style="color:var(--bad)">{{ v.get('violation',0) }}</span></div>
+ <div class="card"><span class="lbl">Need review</span><span class="num" style="color:var(--warn)">{{ v.get('needs_review',0) }}</span></div>
+ <div class="card"><span class="lbl">Passed</span><span class="num" style="color:var(--ok)">{{ v.get('pass',0) }}</span></div>
+ <div class="card"><span class="lbl">Inconclusive / skipped</span><span class="num">{{ v.get('inconclusive',0) + v.get('skipped',0) + v.get('error',0) }}</span></div>
 </div>
 <h2>Findings ({{ findings|length }})</h2>
 {% if not findings %}<p>No violations or review items were found.</p>{% endif %}
 {% for r in findings %}
 <div class="finding {{ r.verdict }}">
- <span class="tag {{ r.verdict }}">{{ labels[r.verdict] }}</span><span class="tag">{{ r.severity }}</span><span class="tag">{{ r.module }}</span>
- <strong>{{ r.name }}</strong>
+ <span class="pill {{ r.verdict }}">{{ labels[r.verdict] }}</span><span class="pill {{ 'bad' if r.severity in ('critical','high') else 'warn' if r.severity == 'medium' else '' }}">{{ r.severity }}</span><span class="pill">{{ r.module }}</span>
+ <h3>{{ r.name }}</h3>
  <div class="mute">id {{ r.id }} &middot; {{ r.endpoint_key }}{% if r.resource %} &middot; {{ r.resource }}{% endif %}</div>
  <p>{{ r.message }}</p>
  {% if r.evidence %}
-  <div class="mute">Expected policy: {{ r.evidence.expected }}</div>
-  {% if r.evidence.diff %}<ul>{% for line in r.evidence.diff %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
+  <div class="xlbl">Expected policy</div><div>{{ r.evidence.expected }}</div>
+  {% if r.evidence.diff %}<div class="xlbl">Analysis</div><ul>{% for line in r.evidence.diff %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
   <div class="cols">
    {% for title, ex in (('Baseline', r.evidence.baseline), ('Test', r.evidence.test)) %}{% if ex %}
-   <div><strong>{{ title }}</strong> <span class="mute">{{ ex.identity or 'anonymous' }}</span>
+   <div><div class="xlbl">{{ title }} &middot; {{ ex.identity or 'anonymous' }}</div>
     <pre>{{ ex.method }} {{ ex.url }}{% for k, val in ex.request_headers.items() %}
 {{ k }}: {{ val }}{% endfor %}{% if ex.request_body %}
 

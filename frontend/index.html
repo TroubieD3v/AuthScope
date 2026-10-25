@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AuthScope - API authorization testing</title>
+    <script>
+      // dark is the default; the toggle stores an explicit choice
+      try {
+        if (localStorage.getItem("authscope.theme") === "light") document.documentElement.classList.remove("dark");
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

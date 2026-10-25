@@ -32,6 +32,12 @@ opens with both requests side by side.*
 |---|---|
 | ![Findings & Reports](docs/screenshots/findings.png) | ![Dashboard](docs/screenshots/dashboard.png) |
 
+Dark is the default theme; the switch in the top bar changes to light (remembered per browser).
+
+| Light theme: dashboard | Light theme: permission matrix |
+|---|---|
+| ![Dashboard, light theme](docs/screenshots/dashboard-light.png) | ![Permission matrix, light theme](docs/screenshots/matrix-light.png) |
+
 ## Checks
 
 Five modules covering the authorization categories of the
@@ -80,7 +86,8 @@ Test      bob   -> GET /api/orders/101   ?
 6. **Run** and read the matrix, the findings and the reports (HTML, Markdown, JSON, pytest).
 
 The interface has six screens: Dashboard, API Explorer, Identity Manager, Permission Matrix, Test Runner, and
-Findings & Reports.
+Findings & Reports, in a dark (default) and a light theme. Palette: primary `#121212`, secondary `#008542`,
+tertiary `#D97706`, neutral `#64748B`; headlines in Manrope, body in Inter (fonts are bundled, no CDN).
 
 | API Explorer | Identity Manager |
 |---|---|
@@ -182,7 +189,7 @@ Browser ──► AuthScope (FastAPI :8080, serves the React UI) ──► Reque
 - `backend/authscope/`: config and policy, safety guard, HTTP engine, comparison, modules, runner, importers,
   reports, storage, web API, CLI.
 - `backend/demo_api/`: the intentionally vulnerable demo API.
-- `frontend/`: React + TypeScript + Vite + Tailwind CSS, shadcn-style components.
+- `frontend/`: React + TypeScript + Vite + Tailwind CSS, shadcn-style components, design tokens in `src/index.css`.
 - `tests/`: unit, integration, CLI and Playwright tests. `docs/`: architecture and threat model.
 
 Details: [docs/architecture.md](docs/architecture.md) · [docs/threat-model.md](docs/threat-model.md) ·
@@ -199,7 +206,8 @@ Mass Assignment and Session Authorization modules, and a Burp Suite extension, a
 |---|---|
 | v1.0.0 | Five modules, baseline comparison, evidence and reports, OpenAPI and Postman import, login flow, web UI, CLI, Docker |
 | v1.1.0 | API key and HTTP Basic auth, nested object paths, screenshots, docs, issue and PR templates |
-| **v1.2.0** | **Stricter comparison (object id required for a violation), DNS pinning, repository renamed to AuthScope** |
+| v1.2.0 | Stricter comparison (object id required for a violation), DNS pinning, repository renamed to AuthScope |
+| **v1.3.0** | **Redesigned interface: dark theme by default with a light theme switch, new palette and typography, redesigned HTML report** |
 
 ## License
 

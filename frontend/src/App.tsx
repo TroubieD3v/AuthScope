@@ -1,7 +1,9 @@
-import { Activity, FlaskConical, Grid3x3, KeyRound, LayoutDashboard, ListTree, ShieldAlert, Trash2 } from "lucide-react";
+import { FlaskConical, Grid3x3, KeyRound, LayoutDashboard, ListTree, ShieldAlert, Trash2 } from "lucide-react";
+import { Logo } from "./components/logo";
 import { useCallback, useEffect, useState } from "react";
 import { Ctx, type Screen } from "./ctx";
 import { api, type Project, type ProjectSummary } from "./lib/api";
+import { ThemeToggle } from "./lib/theme";
 import { cn } from "./lib/utils";
 import { Dashboard } from "./screens/Dashboard";
 import { Explorer } from "./screens/Explorer";
@@ -11,13 +13,13 @@ import { Matrix } from "./screens/Matrix";
 import { Onboarding } from "./screens/Onboarding";
 import { Runner } from "./screens/Runner";
 
-const NAV: { id: Screen; label: string; icon: typeof Activity }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "explorer", label: "API Explorer", icon: ListTree },
-  { id: "identities", label: "Identity Manager", icon: KeyRound },
-  { id: "matrix", label: "Permission Matrix", icon: Grid3x3 },
-  { id: "runner", label: "Test Runner", icon: FlaskConical },
-  { id: "findings", label: "Findings & Reports", icon: ShieldAlert },
+const NAV: { id: Screen; label: string; short: string; icon: typeof ShieldAlert }[] = [
+  { id: "dashboard", label: "Dashboard", short: "Dashboard", icon: LayoutDashboard },
+  { id: "explorer", label: "API Explorer", short: "Explorer", icon: ListTree },
+  { id: "identities", label: "Identity Manager", short: "Identities", icon: KeyRound },
+  { id: "matrix", label: "Permission Matrix", short: "Matrix", icon: Grid3x3 },
+  { id: "runner", label: "Test Runner", short: "Runner", icon: FlaskConical },
+  { id: "findings", label: "Findings & Reports", short: "Findings", icon: ShieldAlert },
 ];
 
 export default function App() {
@@ -57,7 +59,7 @@ export default function App() {
     } else setProject(null);
   }, [pid]);
 
-  const go = (s: Screen) => { setScreen(s); location.hash = s; };
+  const go = (s: Screen) => { setScreen(s); location.hash = s; window.scrollTo({ top: 0 }); };
 
   useEffect(() => {
     const onHash = () => { const h = location.hash.slice(1) as Screen; if (NAV.some((n) => n.id === h)) setScreen(h); };
@@ -77,69 +79,92 @@ export default function App() {
   }
 
   const View = { dashboard: Dashboard, explorer: Explorer, identities: Identities, matrix: Matrix, runner: Runner, findings: Findings }[screen];
+  const deleteProject = async () => {
+    if (!confirm(`Delete project "${project.name}" with all runs?`)) return;
+    await api.deleteProject(pid);
+    const list = await loadProjects();
+    setPid(list[0]?.id ?? null);
+  };
 
   return (
     <Ctx.Provider value={{ project, reload, go, notify, focusRun, setFocusRun }}>
-      <div className="flex h-full">
-        <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-panel/70 backdrop-blur">
-          <div className="px-5 pb-4 pt-5">
-            <div className="flex items-center gap-2.5">
-              <div className="grid size-8 place-items-center rounded-lg bg-accent/15 ring-1 ring-accent/40">
-                <ShieldAlert className="size-4 text-accent" />
-              </div>
-              <div>
-                <div className="text-[15px] font-semibold leading-4 tracking-tight">AuthScope</div>
-                <div className="text-[10px] uppercase tracking-widest text-mute">API Authorization Testing</div>
-              </div>
-            </div>
+      {/* Top app bar */}
+      <header className="sticky top-0 z-40 border-b border-line/60 bg-bg/75 backdrop-blur-xl">
+        <div className="mx-auto flex h-[68px] max-w-[1400px] items-center justify-between gap-4 px-5 lg:px-8">
+          <Logo />
+          <div className="flex items-center gap-2">
+            <select
+              value={pid}
+              aria-label="Project"
+              onChange={(e) => e.target.value === "__new" ? setCreating(true) : setPid(e.target.value)}
+              className="hidden h-9 max-w-[16rem] cursor-pointer rounded-[3px] border border-line bg-panel2/70 px-3 text-xs font-medium sm:block"
+            >
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="__new">+ New project...</option>
+            </select>
+            <ThemeToggle />
           </div>
-          <nav className="flex-1 space-y-0.5 px-3">
+        </div>
+      </header>
+
+      <div className="mx-auto flex max-w-[1400px]">
+        {/* Desktop rail */}
+        <aside className="sticky top-[68px] hidden h-[calc(100vh-68px)] w-64 shrink-0 flex-col justify-between px-5 py-8 lg:flex">
+          <nav className="space-y-1.5">
             {NAV.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => go(id)}
                 className={cn(
-                  "flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-left text-[13px] transition-colors",
-                  screen === id ? "bg-accent/12 text-accent" : "text-mute hover:bg-panel2 hover:text-ink",
+                  "group flex w-full cursor-pointer items-center gap-3 rounded-[3px] px-2 py-1.5 text-left text-[13.5px] font-medium transition-colors",
+                  screen === id ? "text-ink" : "text-mute hover:text-ink",
                 )}
               >
-                <Icon className="size-4" /> {label}
+                <span className={cn(
+                  "grid size-9 place-items-center rounded-[3px] transition-colors",
+                  screen === id ? "bg-primary text-on-primary" : "group-hover:bg-panel2",
+                )}>
+                  <Icon className="size-[18px]" />
+                </span>
+                {label}
               </button>
             ))}
           </nav>
-          <div className="space-y-2 border-t border-line p-3">
-            <select
-              value={pid}
-              onChange={(e) => e.target.value === "__new" ? setCreating(true) : setPid(e.target.value)}
-              className="h-8 w-full cursor-pointer rounded-md border border-line bg-bg/70 px-2 text-xs"
-            >
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              <option value="__new">+ New project...</option>
-            </select>
-            <div className="truncate px-1 font-mono text-[11px] text-mute" title={project.target.base_url}>{project.target.base_url}</div>
-            <button
-              onClick={async () => {
-                if (!confirm(`Delete project "${project.name}" with all runs?`)) return;
-                await api.deleteProject(pid);
-                const list = await loadProjects();
-                setPid(list[0]?.id ?? null);
-              }}
-              className="flex cursor-pointer items-center gap-1.5 px-1 text-[11px] text-mute hover:text-bad"
-            >
+          <div className="space-y-3 rounded-2xl bg-panel2 p-4">
+            <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-mute">Target</div>
+            <div className="truncate font-mono text-xs" title={project.target.base_url}>{project.target.base_url}</div>
+            <button onClick={deleteProject} className="flex cursor-pointer items-center gap-1.5 text-[11px] text-mute hover:text-bad">
               <Trash2 className="size-3" /> Delete project
             </button>
           </div>
         </aside>
-        <main className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[1180px] px-8 py-7"><View /></div>
+
+        <main className="min-w-0 flex-1 px-5 pb-32 pt-8 lg:px-10 lg:pb-16">
+          <div className="mx-auto max-w-[1080px]"><View /></div>
         </main>
       </div>
+
+      {/* Mobile bottom navigation */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line/60 bg-bg/85 backdrop-blur-xl lg:hidden">
+        <div className="mx-auto flex max-w-xl items-center justify-between px-3 py-2">
+          {NAV.map(({ id, short, icon: Icon }) => (
+            <button key={id} onClick={() => go(id)} aria-label={short}
+              className={cn("flex cursor-pointer flex-col items-center gap-1 px-1.5 py-1", screen === id ? "text-ink" : "text-mute")}>
+              <span className={cn("grid size-9 place-items-center rounded-[3px]", screen === id && "bg-primary text-on-primary")}>
+                <Icon className="size-[18px]" />
+              </span>
+              <span className="text-[9.5px] font-bold uppercase tracking-[0.1em]">{short}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
+
       {toast && (
         <div
           role="status"
           className={cn(
-            "fixed bottom-5 right-5 z-50 max-w-md rounded-lg border px-4 py-3 text-sm shadow-xl",
-            toast.kind === "ok" ? "border-ok/40 bg-[#0d2a22] text-ok" : "border-bad/40 bg-[#2d1215] text-bad",
+            "fixed bottom-24 right-5 z-50 max-w-md rounded-2xl px-5 py-3.5 text-sm font-medium shadow-2xl lg:bottom-6",
+            toast.kind === "ok" ? "bg-accent-solid text-white" : "bg-bad-solid text-white",
           )}
         >
           {toast.msg}

@@ -1,13 +1,17 @@
-import { Ban, Play, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Ban, Building2, EyeOff, Gauge, Lock, Play, ShieldCheck, Shuffle, TriangleAlert, UserX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { Field, Input, Toggle } from "@/components/ui/field";
+import { Bar, Card, CardBody, CardHeader, IconTile } from "@/components/ui/card";
+import { Field, Input, Switch, Toggle } from "@/components/ui/field";
 import { useAction, useApp } from "@/ctx";
 import { api, type ModuleInfo, type Run } from "@/lib/api";
 import { fmtTime, MODULE_LABEL } from "@/lib/utils";
-import { PageHeader } from "./common";
+import { PageHeader, SectionTitle } from "./common";
+
+const ICONS: Record<string, typeof Lock> = {
+  bola: Shuffle, bfla: Lock, bopla: EyeOff, unauth: UserX, tenant: Building2, custom: ShieldCheck,
+};
 
 export function Runner() {
   const { project, reload, go, setFocusRun } = useApp();
@@ -70,103 +74,134 @@ export function Runner() {
   const missing = project.identities.filter((i) => i.secret_source === "missing");
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Test Runner" hint="Pick modules, review the safety limits, run." />
+    <div className="space-y-12">
+      <PageHeader
+        kicker={active ? "Running" : "Read-only by default"} kickerTone={active ? "warn" : "accent"}
+        title="Test Runner"
+        hint={<>Choose the checks, review the safety limits and run. <span className="font-semibold text-accent">{selected.length} modules</span> are
+          selected; requests go only to <span className="font-mono text-ink">{project.target.allowed_hosts.join(", ")}</span>.</>}
+        actions={active ? (
+          <Button variant="danger" onClick={() => act(() => api.cancelRun(run!.id), "Cancelling after in-flight requests")}><Ban className="size-4" /> Cancel run</Button>
+        ) : (
+          <Button variant="accent" disabled={selected.length === 0} onClick={start}><Play className="size-4" /> Start run ({selected.length})</Button>
+        )}
+      />
 
       {missing.length > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border border-warn/30 bg-warn/10 px-4 py-2.5 text-sm text-warn">
-          <TriangleAlert className="size-4" /> No token for {missing.map((m) => m.name).join(", ")} - their checks will be skipped. Set tokens in Identity Manager.
+        <div className="flex items-center gap-3 rounded-2xl bg-warn/12 px-5 py-4 text-sm text-warn">
+          <TriangleAlert className="size-4 shrink-0" /> No token for {missing.map((m) => m.name).join(", ")} - their checks will be skipped. Set tokens in Identity Manager.
         </div>
       )}
 
-      <div className="grid grid-cols-5 gap-4">
-        <Card className="col-span-3">
-          <CardHeader title="Modules" />
-          <div className="divide-y divide-line">
-            {mods?.modules.map((m) => (
-              <label key={m.name} className="flex cursor-pointer items-start gap-3 px-5 py-3 hover:bg-panel2/40">
-                <input type="checkbox" className="mt-1 size-4 accent-[#2dd4bf]" checked={selected.includes(m.name)}
-                  onChange={(e) => setSelected(e.target.checked ? [...selected, m.name] : selected.filter((x) => x !== m.name))} />
-                <div><div className="font-medium">{m.title}</div><div className="text-xs text-mute">{m.description}</div></div>
-              </label>
-            ))}
-            {mods?.roadmap.map((m) => (
-              <div key={m.name} className="flex items-center gap-3 px-5 py-2.5 opacity-50">
-                <input type="checkbox" disabled className="size-4" /> <span>{m.title}</span><Badge>planned</Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="col-span-2">
-          <CardHeader title="Safety limits" hint="Requests go only to allowed hosts. Redirects are not followed." />
-          <CardBody className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Max requests / second"><Input type="number" min={0.1} max={100} step={0.5} value={limits.rps} onChange={(e) => setLimits({ ...limits, rps: Number(e.target.value) })} /></Field>
-              <Field label="Request budget per run"><Input type="number" min={1} value={limits.budget} onChange={(e) => setLimits({ ...limits, budget: Number(e.target.value) })} /></Field>
-            </div>
-            <div className="rounded-md border border-line bg-panel2/50 p-3">
-              <Toggle checked={limits.mutating} onChange={(v) => setLimits({ ...limits, mutating: v })} label={<span className="font-medium">Allow state-changing requests (PUT/POST/DELETE)</span>} />
-              <p className="mt-1 text-xs text-mute">Off by default. Use only with disposable test data and a reset endpoint.</p>
-              {limits.mutating && (
-                <div className="mt-3 space-y-2">
-                  <Field label="Reset endpoint (POST)" hint="Called after every state-changing request"><Input className="font-mono" value={limits.resetPath} onChange={(e) => setLimits({ ...limits, resetPath: e.target.value })} placeholder="/__test/reset" /></Field>
-                  <Field label="Reset as identity"><Input value={limits.resetIdentity} onChange={(e) => setLimits({ ...limits, resetIdentity: e.target.value })} placeholder="admin" /></Field>
-                  {!limits.resetPath && <Toggle checked={limits.noReset} onChange={(v) => setLimits({ ...limits, noReset: v })} label="I accept that test data is not reset" />}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2 pt-1">
-              {active ? (
-                <Button variant="danger" onClick={() => act(() => api.cancelRun(run!.id), "Cancelling after in-flight requests")}><Ban className="size-4" /> Cancel run</Button>
-              ) : (
-                <Button disabled={selected.length === 0} onClick={start}><Play className="size-4" /> Start run ({selected.length})</Button>
-              )}
-            </div>
-          </CardBody>
-        </Card>
-      </div>
-
       {run && (
-        <Card>
-          <CardHeader title={`Run ${run.id}`} hint={`${run.status} - started ${fmtTime(run.started_at)}`}
-            actions={!active && <Button size="sm" onClick={() => { setFocusRun(run.id); go("findings"); }}><ShieldCheck className="size-3.5" /> Open findings</Button>} />
-          <CardBody className="space-y-3">
-            <div className="h-2.5 overflow-hidden rounded-full bg-panel2">
-              <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+        <Card tone="inverse" className="p-7">
+          <div className="absolute -right-16 -top-16 size-56 rounded-full bg-accent/25 blur-3xl" />
+          <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-5">
+              <IconTile className="size-14 bg-accent-solid text-white"><Gauge className="size-6" /></IconTile>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] opacity-70">{run.status} - started {fmtTime(run.started_at)}</div>
+                <h3 className="mt-1 font-display text-3xl font-bold tracking-tight">Run {run.id}</h3>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-xs">
-              <span>{run.stats.done}/{run.stats.total} checks ({pct}%)</span>
-              <span className="text-mute">{run.stats.requests} requests</span>
-              <span className="text-bad">{v.violation ?? 0} violations</span>
-              <span className="text-warn">{v.needs_review ?? 0} review</span>
-              <span className="text-ok">{v.pass ?? 0} passed</span>
-              <span className="text-info">{v.inconclusive ?? 0} inconclusive</span>
-              <span className="text-mute">{v.skipped ?? 0} skipped</span>
+            {!active && <Button variant="accent" onClick={() => { setFocusRun(run.id); go("findings"); }}><ShieldCheck className="size-4" /> Open findings</Button>}
+          </div>
+          <div className="relative mt-6">
+            <div className="h-2 w-full overflow-hidden bg-white/10"><div className="h-full bg-[#3fbf75] transition-all" style={{ width: `${pct}%` }} /></div>
+            <div className="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-sm">
+              <span className="font-semibold">{run.stats.done}/{run.stats.total} checks ({pct}%)</span>
+              <span className="opacity-70">{run.stats.requests} requests</span>
+              <span className="font-semibold text-[#f2716b]">{v.violation ?? 0} violations</span>
+              <span className="font-semibold text-[#f59a3c]">{v.needs_review ?? 0} review</span>
+              <span className="font-semibold text-[#3fbf75]">{v.pass ?? 0} passed</span>
+              <span className="opacity-70">{v.inconclusive ?? 0} inconclusive</span>
+              <span className="opacity-70">{v.skipped ?? 0} skipped</span>
             </div>
-            {run.error && <p className="text-sm text-bad">{run.error}</p>}
-            {(run.extra.warnings ?? []).map((w) => <p key={w} className="text-xs text-warn">{w}</p>)}
-          </CardBody>
+            {run.error && <p className="mt-3 text-sm text-[#f2716b]">{run.error}</p>}
+            {(run.extra.warnings ?? []).map((w) => <p key={w} className="mt-2 text-xs text-[#f59a3c]">{w}</p>)}
+          </div>
         </Card>
       )}
 
-      <Card>
-        <CardHeader title="Previous runs" />
-        <table className="w-full text-left text-sm">
-          <tbody>
-            {history.length === 0 && <tr><td className="px-5 py-4 text-mute">No runs yet.</td></tr>}
-            {history.map((r) => (
-              <tr key={r.id} className="cursor-pointer border-t border-line first:border-0 hover:bg-panel2/50" onClick={() => { setFocusRun(r.id); go("findings"); }}>
-                <td className="px-5 py-2 font-mono text-xs">{r.id}</td>
-                <td className="text-mute">{fmtTime(r.started_at)}</td>
-                <td className="text-xs text-mute">{r.modules.map((m) => MODULE_LABEL[m] ?? m).join(", ")}</td>
-                <td><Badge tone={r.status === "completed" ? "ok" : r.status === "failed" ? "bad" : "mute"}>{r.status}</Badge></td>
-                <td className="pr-5 text-right font-mono text-xs text-bad">{r.stats.by_verdict.violation ?? 0} violations</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      <section className="space-y-6">
+        <SectionTitle title="Modules" hint="Each module records what passed, not only what failed." />
+        <div className="grid gap-5 md:grid-cols-2">
+          {mods?.modules.map((m) => {
+            const Icon = ICONS[m.name] ?? ShieldCheck;
+            const on = selected.includes(m.name);
+            return (
+              <div key={m.name} className={on
+                ? "flex flex-col justify-between gap-6 rounded-3xl bg-panel p-7 shadow-[0_24px_40px_-16px_rgb(11_28_48/0.10)] ring-1 ring-line/60 transition-colors dark:shadow-none"
+                : "flex flex-col justify-between gap-6 rounded-3xl bg-panel2 p-7 transition-colors"}>
+                <div className="flex items-start justify-between gap-4">
+                  <IconTile tone={on ? "accent" : "info"}><Icon className="size-5" /></IconTile>
+                  <Switch checked={on} label={m.title}
+                    onChange={(c) => setSelected(c ? [...selected, m.name] : selected.filter((x) => x !== m.name))} />
+                </div>
+                <div>
+                  <h3 className="font-display text-xl font-bold tracking-tight">{m.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-mute">{m.description}</p>
+                </div>
+              </div>
+            );
+          })}
+          {mods?.roadmap.map((m) => (
+            <div key={m.name} className="flex items-center justify-between rounded-3xl border border-dashed border-line px-7 py-5 text-mute">
+              <span className="font-display font-semibold">{m.title}</span><Badge>planned</Badge>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-5">
+        <Card className="lg:col-span-2">
+          <CardHeader title="Safety limits" hint="Requests go only to allowed hosts, one validated address per request. Redirects are not followed." />
+          <CardBody className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Requests / second"><Input type="number" min={0.1} max={100} step={0.5} value={limits.rps} onChange={(e) => setLimits({ ...limits, rps: Number(e.target.value) })} /></Field>
+              <Field label="Budget per run"><Input type="number" min={1} value={limits.budget} onChange={(e) => setLimits({ ...limits, budget: Number(e.target.value) })} /></Field>
+            </div>
+            <div className="rounded-2xl bg-panel2 p-4">
+              <Toggle checked={limits.mutating} onChange={(x) => setLimits({ ...limits, mutating: x })} label={<span className="font-semibold">Allow state-changing requests</span>} />
+              <p className="mt-2 text-xs text-mute">PUT / POST / DELETE. Off by default; use only with disposable test data and a reset endpoint.</p>
+              {limits.mutating && (
+                <div className="mt-4 space-y-3">
+                  <Field label="Reset endpoint (POST)" hint="Called after every state-changing request"><Input className="font-mono" value={limits.resetPath} onChange={(e) => setLimits({ ...limits, resetPath: e.target.value })} placeholder="/__test/reset" /></Field>
+                  <Field label="Reset as identity"><Input value={limits.resetIdentity} onChange={(e) => setLimits({ ...limits, resetIdentity: e.target.value })} placeholder="admin" /></Field>
+                  {!limits.resetPath && <Toggle checked={limits.noReset} onChange={(x) => setLimits({ ...limits, noReset: x })} label="I accept that test data is not reset" />}
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+
+        <div className="space-y-5 lg:col-span-3">
+          <SectionTitle title="Previous runs" />
+          <div className="space-y-3">
+            {history.length === 0 && <p className="rounded-3xl bg-panel2 p-6 text-sm text-mute">No runs yet.</p>}
+            {history.map((r) => {
+              const total = Object.values(r.stats.by_verdict).reduce((a, n) => a + n, 0) || 1;
+              return (
+                <button key={r.id} onClick={() => { setFocusRun(r.id); go("findings"); }}
+                  className="block w-full cursor-pointer rounded-2xl bg-panel2 p-5 text-left transition-colors hover:bg-high">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <span className="font-mono text-xs font-semibold">{r.id}</span>
+                      <span className="ml-3 text-xs text-mute">{fmtTime(r.started_at)}</span>
+                    </div>
+                    <Badge tone={r.status === "completed" ? "ok" : r.status === "failed" ? "bad" : "mute"}>{r.status}</Badge>
+                  </div>
+                  <div className="mt-2 text-xs text-mute">{r.modules.map((m) => MODULE_LABEL[m] ?? m).join(", ")}</div>
+                  <div className="mt-3 flex items-center gap-4">
+                    <Bar value={((r.stats.by_verdict.pass ?? 0) / total) * 100} />
+                    <span className="shrink-0 text-xs font-bold text-bad">{r.stats.by_verdict.violation ?? 0} violations</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

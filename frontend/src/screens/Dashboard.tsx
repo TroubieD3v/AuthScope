@@ -1,12 +1,16 @@
+import { ArrowUpRight, Building2, EyeOff, Lock, Play, ShieldCheck, Shuffle, UserX } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardBody, CardHeader, Stat } from "@/components/ui/card";
+import { Bar, Card, IconTile, Stat } from "@/components/ui/card";
 import { useApp } from "@/ctx";
 import { api, type CheckResult, type Dashboard as Dash } from "@/lib/api";
 import { fmtTime, MODULE_LABEL, SEVERITY_TONE } from "@/lib/utils";
-import { PageHeader } from "./common";
+import { Dial, PageHeader, SectionTitle } from "./common";
+
+const MODULE_ICON: Record<string, typeof Lock> = {
+  bola: Shuffle, bfla: Lock, bopla: EyeOff, unauth: UserX, tenant: Building2, custom: ShieldCheck,
+};
 
 export function Dashboard() {
   const { project, go, setFocusRun } = useApp();
@@ -16,96 +20,149 @@ export function Dashboard() {
   useEffect(() => {
     api.dashboard(project.id).then(async (dash) => {
       setD(dash);
-      if (dash.latest_run) setTop((await api.results(dash.latest_run.id, "findings")).slice(0, 5));
+      if (dash.latest_run) setTop((await api.results(dash.latest_run.id, "findings")).slice(0, 4));
     });
   }, [project.id]);
 
   if (!d) return <div className="text-mute">Loading...</div>;
   const v = d.verdicts;
-  const findings = (v.violation ?? 0) + (v.needs_review ?? 0);
-  const modules = Object.entries(d.modules);
+  const violations = v.violation ?? 0;
+  const review = v.needs_review ?? 0;
+  const findings = violations + review;
+  const tested = Object.entries(v).filter(([k]) => k !== "skipped").reduce((a, [, n]) => a + n, 0);
+  const passed = v.pass ?? 0;
+  const run = d.latest_run;
+  const openRun = (id: string) => { setFocusRun(id); go("findings"); };
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Dashboard" hint={`${project.name} - ${project.target.base_url}`}
-        actions={<Button onClick={() => go("runner")}><Play className="size-4" /> New test run</Button>} />
+    <div className="space-y-12">
+      <PageHeader
+        kicker={!run ? "No runs yet" : violations ? "Action needed" : "Policy holds"}
+        kickerTone={!run ? "mute" : violations ? "bad" : "accent"}
+        title="Authorization posture"
+        hint={run
+          ? <>The last run checked <b className="text-ink">{tested} cases</b> across {d.endpoints} endpoints.{" "}
+              {violations ? <><span className="font-semibold text-bad">{violations} break your policy</span>{review ? `, ${review} need review.` : "."}</> : "Nothing breaks your policy."}</>
+          : "Add identities and objects, review the Permission Matrix, then start a run."}
+        actions={<Button variant="accent" onClick={() => go("runner")}><Play className="size-4" /> New test run</Button>}
+      />
 
-      <div className="grid grid-cols-4 gap-4">
-        <Stat label="Endpoints" value={d.endpoints} />
-        <Stat label="Test identities" value={d.identities} />
-        <Stat label="Findings" value={d.latest_run ? findings : "-"} tone={findings ? "bad" : undefined} />
-        <Stat label="Checks passed" value={d.latest_run ? (v.pass ?? 0) : "-"} tone={d.latest_run ? "ok" : undefined} />
-      </div>
+      <section className="grid gap-6 lg:grid-cols-5">
+        <Card tone="container" className="flex flex-col items-center px-6 py-10 lg:col-span-3">
+          <Dial outer={tested ? passed / tested : 0} inner={tested ? findings / tested : 0}>
+            <div className="font-display text-6xl font-bold tracking-tight">{run ? findings : "-"}</div>
+            <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-mute">Findings</div>
+            <div className="mt-4 flex items-center justify-center gap-2 font-display text-lg font-semibold text-accent">
+              <ShieldCheck className="size-4" /> {run ? `${passed} passed` : "not run"}
+            </div>
+          </Dial>
+          <div className="mt-8 grid w-full max-w-md grid-cols-2 gap-8">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-mute">Policy violations</div>
+              <div className="mt-1 font-display text-3xl font-bold text-bad">{run ? violations : "-"}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-mute">Needs review</div>
+              <div className="mt-1 font-display text-3xl font-bold text-warn">{run ? review : "-"}</div>
+            </div>
+          </div>
+        </Card>
 
-      {!d.latest_run ? (
-        <Card><CardBody className="py-10 text-center text-mute">
-          No test runs yet. Add identities and resources, review the Permission Matrix, then start a run.
-        </CardBody></Card>
-      ) : (
-        <div className="grid grid-cols-5 gap-4">
-          <Card className="col-span-3">
-            <CardHeader title="Results by module" hint={`Run ${d.latest_run.id} - ${fmtTime(d.latest_run.started_at)}`} />
-            <CardBody className="space-y-3">
-              {modules.map(([m, c]) => {
-                const total = Object.values(c).reduce((a, b) => a + b, 0) || 1;
-                const seg = (k: string, cls: string) => c[k] ? <div title={`${k}: ${c[k]}`} className={cls} style={{ width: `${(c[k] / total) * 100}%` }} /> : null;
-                return (
-                  <div key={m}>
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span className="font-medium">{MODULE_LABEL[m] ?? m}</span>
-                      <span className="font-mono text-mute">
-                        {c.violation ?? 0} violations - {c.needs_review ?? 0} review - {c.pass ?? 0} passed
-                      </span>
-                    </div>
-                    <div className="flex h-2 overflow-hidden rounded-full bg-panel2">
-                      {seg("violation", "bg-bad")}{seg("needs_review", "bg-warn")}{seg("pass", "bg-ok")}
-                      {seg("inconclusive", "bg-info/60")}{seg("skipped", "bg-line")}
-                    </div>
-                  </div>
-                );
-              })}
-            </CardBody>
-          </Card>
-          <Card className="col-span-2">
-            <CardHeader title="Top findings" actions={<Button size="sm" variant="ghost" onClick={() => { setFocusRun(d.latest_run!.id); go("findings"); }}>View all</Button>} />
-            <CardBody className="space-y-2.5">
-              {top.length === 0 && <p className="text-sm text-ok">No violations in the latest run.</p>}
-              {top.map((f) => (
-                <div key={f.id} className="rounded-md border border-line bg-panel2/60 p-2.5">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Badge tone={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>
-                    <span className="text-[11px] text-mute">{MODULE_LABEL[f.module]}</span>
-                  </div>
-                  <div className="text-xs leading-snug">{f.name}</div>
-                </div>
-              ))}
-            </CardBody>
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          <div className="grid grid-cols-2 gap-4">
+            <Stat label="Endpoints" value={d.endpoints} />
+            <Stat label="Test identities" value={d.identities} />
+            <Stat label="Test objects" value={d.resources} />
+            <Stat label="Checks passed" value={run ? passed : "-"} tone={run ? "ok" : undefined} />
+          </div>
+          <Card tone="inverse" className="flex flex-1 flex-col justify-between gap-6 p-7">
+            <div className="absolute -right-10 -top-10 size-40 rounded-full bg-accent/25 blur-3xl" />
+            <div className="relative flex items-start gap-4">
+              <IconTile tone="accent" className="bg-accent-solid text-white"><Play className="size-5" /></IconTile>
+              <div>
+                <h3 className="font-display text-2xl font-bold tracking-tight">Run every check</h3>
+                <p className="mt-1 text-sm opacity-75">BOLA, BFLA, BOPLA, unauthenticated and cross-tenant, read-only and rate-limited.</p>
+              </div>
+            </div>
+            <div className="relative flex items-center justify-between">
+              <span className="text-xs opacity-70">{run ? `Last run ${fmtTime(run.started_at)}` : "No runs yet"}</span>
+              <Button variant="accent" size="sm" onClick={() => go("runner")}>Configure run</Button>
+            </div>
           </Card>
         </div>
+      </section>
+
+      {run && (
+        <section className="space-y-6">
+          <SectionTitle title="Results by module" hint={`Run ${run.id} - ${fmtTime(run.started_at)}`} />
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(d.modules).map(([m, c]) => {
+              const Icon = MODULE_ICON[m] ?? ShieldCheck;
+              const total = Object.entries(c).filter(([k]) => k !== "skipped").reduce((a, [, n]) => a + n, 0) || 1;
+              const bad = c.violation ?? 0;
+              return (
+                <div key={m} className="flex flex-col justify-between rounded-3xl bg-panel2 p-6 transition-colors hover:bg-high">
+                  <div className="flex items-start justify-between">
+                    <IconTile tone={bad ? "bad" : "accent"}><Icon className="size-5" /></IconTile>
+                    <span className={bad ? "text-xs font-bold text-bad" : "text-xs font-bold text-accent"}>
+                      {bad ? `${bad} violation${bad > 1 ? "s" : ""}` : "Clean"}
+                    </span>
+                  </div>
+                  <div className="mt-8">
+                    <h4 className="font-display text-lg font-bold">{MODULE_LABEL[m] ?? m}</h4>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="font-display text-3xl font-bold">{c.pass ?? 0}</span>
+                      <span className="text-sm text-mute">of {total} passed</span>
+                    </div>
+                    <Bar className="mt-4" value={((c.pass ?? 0) / total) * 100} tone={bad ? "ink" : "accent"} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
-      <Card>
-        <CardHeader title="Run history" />
-        <table className="w-full text-left text-sm">
-          <thead className="text-xs text-mute"><tr>
-            <th className="px-5 py-2 font-medium">Run</th><th className="font-medium">Started</th><th className="font-medium">Status</th>
-            <th className="font-medium">Violations</th><th className="font-medium">Review</th><th className="font-medium">Passed</th>
-          </tr></thead>
-          <tbody>
-            {d.history.length === 0 && <tr><td colSpan={6} className="px-5 py-4 text-mute">Nothing yet.</td></tr>}
-            {d.history.map((r) => (
-              <tr key={r.id} className="cursor-pointer border-t border-line hover:bg-panel2/50" onClick={() => { setFocusRun(r.id); go("findings"); }}>
-                <td className="px-5 py-2 font-mono text-xs">{r.id}</td>
-                <td className="text-mute">{fmtTime(r.started_at)}</td>
-                <td><Badge tone={r.status === "completed" ? "ok" : r.status === "failed" ? "bad" : "mute"}>{r.status}</Badge></td>
-                <td className="font-mono text-bad">{r.violations}</td>
-                <td className="font-mono text-warn">{r.review}</td>
-                <td className="font-mono text-ok">{r.passed}</td>
-              </tr>
+      <section className="grid gap-6 lg:grid-cols-5">
+        <div className="space-y-5 lg:col-span-3">
+          <SectionTitle title="Top findings" actions={run && <button onClick={() => openRun(run.id)} className="cursor-pointer text-sm font-semibold text-accent hover:underline">View all</button>} />
+          <div className="space-y-3">
+            {!run && <p className="rounded-3xl bg-panel2 p-6 text-sm text-mute">Findings appear here after the first run.</p>}
+            {run && top.length === 0 && <p className="rounded-3xl bg-panel2 p-6 text-sm text-accent">No violations in the latest run.</p>}
+            {top.map((f) => (
+              <button key={f.id} onClick={() => openRun(run!.id)} className="flex w-full cursor-pointer items-center gap-4 rounded-2xl bg-panel2 p-4 text-left transition-colors hover:bg-high">
+                <IconTile tone={f.verdict === "violation" ? "bad" : "warn"} className="size-10"><ShieldCheck className="size-4" /></IconTile>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{f.name}</div>
+                  <div className="mt-0.5 text-xs text-mute">{MODULE_LABEL[f.module] ?? f.module}</div>
+                </div>
+                <Badge tone={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>
+              </button>
             ))}
-          </tbody>
-        </table>
-      </Card>
+          </div>
+        </div>
+
+        <div className="space-y-5 lg:col-span-2">
+          <SectionTitle title="Run history" />
+          <Card className="divide-y divide-line/70">
+            {d.history.length === 0 && <p className="p-6 text-sm text-mute">Nothing yet.</p>}
+            {d.history.map((r) => (
+              <button key={r.id} onClick={() => openRun(r.id)} className="flex w-full cursor-pointer items-center justify-between gap-3 px-6 py-4 text-left transition-colors hover:bg-panel2">
+                <div>
+                  <div className="font-mono text-xs font-semibold">{r.id}</div>
+                  <div className="mt-0.5 text-xs text-mute">{fmtTime(r.started_at)}</div>
+                </div>
+                <div className="flex items-center gap-3 text-xs font-bold">
+                  <span className="text-bad">{r.violations}</span>
+                  <span className="text-warn">{r.review}</span>
+                  <span className="text-accent">{r.passed}</span>
+                  <ArrowUpRight className="size-4 text-mute" />
+                </div>
+              </button>
+            ))}
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }

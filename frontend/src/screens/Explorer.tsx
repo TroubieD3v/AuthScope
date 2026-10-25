@@ -48,10 +48,11 @@ export function Explorer() {
     (e.method + " " + e.path + " " + (e.summary ?? "") + " " + e.tags.join(" ")).toLowerCase().includes(filter.toLowerCase()));
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="API Explorer" hint="Target, OpenAPI import and the endpoint inventory with its access rules." />
+    <div className="space-y-10">
+      <PageHeader kicker="Inventory" title="API Explorer"
+        hint={<>Your target, spec import and <span className="font-semibold text-accent">{project.endpoints.length} endpoints</span> with their access rules. Specs say how to authenticate, not who owns what, so imported rules stay marked <i>inferred</i> until you confirm them.</>} />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title="Target" hint="The engine only contacts hosts in this list." />
           <CardBody className="space-y-3">
@@ -70,7 +71,7 @@ export function Explorer() {
             <Textarea rows={2} placeholder="...or paste a spec / collection here" value={specText} onChange={(e) => setSpecText(e.target.value)} />
             <div className="flex gap-2">
               <Button variant="secondary" size="sm" disabled={!specText.trim()} onClick={() => doImport({ content: specText })}>Import pasted</Button>
-              <label className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-line bg-panel2 px-2.5 text-xs hover:bg-[#1b2735]">
+              <label className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[3px] bg-panel2 px-3 text-xs font-semibold hover:bg-high">
                 <FileUp className="size-3.5" /> From file
                 <input type="file" hidden accept=".json,.yaml,.yml" onChange={async (e) => { const f = e.target.files?.[0]; if (f) doImport({ content: await f.text() }); e.target.value = ""; }} />
               </label>
@@ -84,7 +85,7 @@ export function Explorer() {
         <CardHeader title={`Endpoints (${project.endpoints.length})`}
           hint="OpenAPI cannot say who owns what - confirm the inferred access rules (marked 'inferred')."
           actions={<Input className="h-8 w-56" placeholder="Filter..." value={filter} onChange={(e) => setFilter(e.target.value)} />} />
-        <div className="divide-y divide-line">
+        <div className="mx-3 mb-3 divide-y divide-line/60 overflow-hidden rounded-2xl bg-panel2/60">
           {endpoints.length === 0 && <p className="px-5 py-6 text-sm text-mute">No endpoints yet - import a spec or add one below.</p>}
           {endpoints.map((ep) => {
             const key = `${ep.method} ${ep.path}`;

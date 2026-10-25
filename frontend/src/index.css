@@ -1,38 +1,99 @@
 @import "tailwindcss";
+@import "@fontsource-variable/manrope";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Palette: Primary #121212, Secondary #008542, Tertiary #D97706, Neutral #64748B.
+ * Headline: Manrope. Body and labels: Inter. Dark theme is the default.
+ */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
-  --color-bg: #090d12;
-  --color-panel: #101720;
-  --color-panel2: #151e29;
-  --color-line: #1f2b39;
-  --color-ink: #e7edf4;
-  --color-mute: #8493a5;
-  --color-accent: #2dd4bf;
-  --color-bad: #f87171;
-  --color-warn: #fbbf24;
-  --color-ok: #34d399;
-  --color-info: #60a5fa;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-display: "Manrope Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --color-bg: var(--bg);
+  --color-panel: var(--surface);
+  --color-panel2: var(--surface-container);
+  --color-high: var(--surface-high);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-mute: var(--mute);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-inverse: var(--inverse);
+  --color-on-inverse: var(--on-inverse);
+  --color-accent: var(--accent);
+  --color-accent-solid: #008542;
+  --color-ok: var(--accent);
+  --color-warn: var(--warn);
+  --color-warn-solid: #d97706;
+  --color-bad: var(--bad);
+  --color-bad-solid: #c62828;
+  --color-info: var(--info);
 }
 
-html, body, #root { height: 100%; }
+:root {
+  color-scheme: light;
+  --bg: #f4f7fc;
+  --surface: #ffffff;
+  --surface-container: #e8effa;
+  --surface-high: #dbe5f5;
+  --line: #d3dceb;
+  --ink: #121212;
+  --mute: #64748b;
+  --primary: #121212;
+  --on-primary: #ffffff;
+  --inverse: #1e293b;
+  --on-inverse: #f1f5f9;
+  --accent: #008542;
+  --warn: #b45f06;
+  --bad: #c62828;
+  --info: #475569;
+  --glow: rgb(0 133 66 / 0.10);
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: #0d0d0e;
+  --surface: #161617;
+  --surface-container: #1d1e20;
+  --surface-high: #26282b;
+  --line: #2e3033;
+  --ink: #f3f3f2;
+  --mute: #94a3b8;
+  --primary: #f3f3f2;
+  --on-primary: #121212;
+  --inverse: #233046;
+  --on-inverse: #e2e8f0;
+  --accent: #3fbf75;
+  --warn: #f59a3c;
+  --bad: #f2716b;
+  --info: #a7b3c4;
+  --glow: rgb(63 191 117 / 0.08);
+}
+
+html, body { height: 100%; }
+#root { min-height: 100%; }
 body {
-  background: var(--color-bg);
-  color: var(--color-ink);
+  background: var(--bg);
+  color: var(--ink);
   font-family: var(--font-sans);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  transition: background-color .2s ease, color .2s ease;
 }
 body::before {
   content: "";
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background:
-    radial-gradient(900px 400px at 85% -10%, rgb(45 212 191 / 0.07), transparent 60%),
-    radial-gradient(700px 400px at -10% 110%, rgb(96 165 250 / 0.05), transparent 60%);
+  background: radial-gradient(900px 480px at 88% -12%, var(--glow), transparent 62%);
 }
 #root { position: relative; z-index: 1; }
-::selection { background: rgb(45 212 191 / 0.3); }
+::selection { background: rgb(0 133 66 / 0.3); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #243244; border-radius: 6px; }
+::-webkit-scrollbar-thumb { background: var(--surface-high); border-radius: 6px; }
 pre, code { font-family: var(--font-mono); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
