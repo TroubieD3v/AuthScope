@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "authscope"
-version = "1.4.0"
+version = "1.5.0"
 description = "AuthScope - API authorization testing platform (BOLA/IDOR, BFLA, BOPLA, tenant isolation)"
 readme = "README.md"
 requires-python = ">=3.11"

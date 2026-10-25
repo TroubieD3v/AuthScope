@@ -36,15 +36,19 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -e .
-      - name: Start secure and vulnerable demo APIs
+      - name: Start secure and flawed instances of both test stands
         run: |
           DEMO_VULNS= DEMO_PORT=8000 python -m demo_api &
           DEMO_VULNS=bola,bfla,bopla,unauth,tenant DEMO_PORT=8001 python -m demo_api &
-          for port in 8000 8001; do
-            for i in $(seq 1 50); do curl -sf "http://127.0.0.1:$port/health" > /dev/null && break; sleep 0.2; done
+          LEDGER_FLAWS= LEDGER_PORT=8100 python -m ledger_api &
+          LEDGER_FLAWS=bola,bfla,bopla,tenant LEDGER_PORT=8101 python -m ledger_api &
+          for url in 127.0.0.1:8000/health 127.0.0.1:8001/health 127.0.0.1:8100/v2/health 127.0.0.1:8101/v2/health; do
+            for i in $(seq 1 50); do curl -sf "http://$url" > /dev/null && break; sleep 0.2; done
           done
-      - name: Run the gate
-        run: python scripts/ci_gate.py --secure http://127.0.0.1:8000 --vulnerable http://127.0.0.1:8001 --out authz-reports
+      - name: Gate - demo stand
+        run: python scripts/ci_gate.py --stand demo --secure http://127.0.0.1:8000 --vulnerable http://127.0.0.1:8001 --out authz-reports
+      - name: Gate - independent ledger stand
+        run: python scripts/ci_gate.py --stand ledger --secure http://127.0.0.1:8100 --vulnerable http://127.0.0.1:8101 --out authz-reports
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: authz-reports, path: authz-reports }

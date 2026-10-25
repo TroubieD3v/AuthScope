@@ -195,9 +195,14 @@ proves that every planted flaw is found **and** that the secure variant produces
   wrappers, GraphQL errors, HTML login pages with 200, truncated JSON...) with the verdict each must get.
 - Property-based tests (Hypothesis): a 200 without the requested id is never a confirmed violation, the
   classifier never crashes, and a known secret never survives masking wherever it is placed.
-- `scripts/ci_gate.py` runs in CI against a secure and a vulnerable demo: zero findings on one, exactly the
+- A second, independently written test stand (`python -m ledger_api`) uses other conventions: API keys,
+  UUIDs, `{"data": ...}` envelopes, refusals as HTTP 200 with an `errors` array, composite invoice ids.
+- `scripts/ci_gate.py` runs in CI against a correct and a flawed instance of **both** stands: zero findings on one, exactly the
   expected list ([examples/expected-findings.json](examples/expected-findings.json)) on the other, evidence that
   points at the reported object, and no credentials in any report format.
+
+Results: **52 of 52 planted flaws found, 0 false positives** on the correct instances - see
+[docs/benchmarks.md](docs/benchmarks.md) for the table, the limits of these numbers and how to reproduce them.
 
 CI also builds the Docker image and runs the browser test.
 
@@ -210,11 +215,12 @@ Browser ──► AuthScope (FastAPI :8080, serves the React UI) ──► Reque
 
 - `backend/authscope/`: config and policy, safety guard, HTTP engine, comparison, modules, runner, importers,
   reports, storage, web API, CLI.
-- `backend/demo_api/`: the intentionally vulnerable demo API.
+- `backend/demo_api/`, `backend/ledger_api/`: the two intentionally flawed test stands.
 - `frontend/`: React + TypeScript + Vite + Tailwind CSS, shadcn-style components, design tokens in `src/index.css`.
 - `tests/`: unit, integration, CLI and Playwright tests. `docs/`: architecture and threat model.
 
 Details: [docs/architecture.md](docs/architecture.md) · [docs/threat-model.md](docs/threat-model.md) ·
+[docs/benchmarks.md](docs/benchmarks.md) ·
 [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md).
 
 ## Roadmap
@@ -230,7 +236,8 @@ Mass Assignment and Session Authorization modules, and a Burp Suite extension, a
 | v1.1.0 | API key and HTTP Basic auth, nested object paths, screenshots, docs, issue and PR templates |
 | v1.2.0 | Stricter comparison (object id required for a violation), DNS pinning, repository renamed to AuthScope |
 | v1.3.0 | Redesigned interface: dark theme by default with a light theme switch, new palette and typography, redesigned HTML report |
-| **v1.4.0** | **Two-sided CI gate, false-positive corpus and property tests, 429/retry handling, composite identifiers via JSONPath** |
+| v1.4.0 | Two-sided CI gate, false-positive corpus and property tests, 429/retry handling, composite identifiers via JSONPath |
+| **v1.5.0** | **Independent ledger test stand, gate on both stands, per-object path parameters, benchmark results** |
 
 ## License
 

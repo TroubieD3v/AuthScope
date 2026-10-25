@@ -17,7 +17,8 @@ A module lives in `backend/authscope/modules/` and implements two methods:
 
 Register it in `modules/__init__.py`. Every module needs:
 
-1. a planted flaw in `backend/demo_api` that can be switched off through `DEMO_VULNS`;
+1. a planted flaw in `backend/demo_api` (switch: `DEMO_VULNS`) and, where the API style matters, in
+   `backend/ledger_api` (switch: `LEDGER_FLAWS`), with the expected findings added to `examples/expected-findings*.json`;
 2. an integration test proving the flaw is found **and** that the secure demo produces no findings.
 
 All requests must go through `Requester.send`, which enforces the allow-list, address checks, rate limit, budget

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.0
+
+- Independent second test stand `ledger_api` with different API conventions: API keys in a header, UUIDs,
+  `{"data": ...}` envelopes, refusals as HTTP 200 with an `errors` array, paginated lists, and invoices identified
+  by (workspace, number) with numbers that repeat across workspaces.
+- The CI gate runs on a correct and a flawed instance of both stands (`--stand demo|ledger`); per-stand expected
+  findings in `examples/expected-findings-ledger.json`.
+- Resources can carry explicit path parameters (`params`) for objects addressed by several path segments; together
+  with JSONPath `match` rules this covers composite identifiers end to end.
+- `docs/benchmarks.md`: 52 of 52 planted flaws found and 0 false positives across both stands, with the limits of
+  these numbers and how to reproduce them.
+
 ## 1.4.0
 
 - CI authorization gate (`scripts/ci_gate.py`) now checks both sides: zero findings on the secure demo, exactly the

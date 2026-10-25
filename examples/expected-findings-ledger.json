@@ -1,0 +1,18 @@
+{
+  "violations": [
+    "bfla | nina | GET /v2/admin/audit-log | -",
+    "bfla | omar | GET /v2/admin/audit-log | -",
+    "bfla | pia | GET /v2/admin/audit-log | -",
+    "bola | nina | GET /v2/documents | -",
+    "bola | nina | GET /v2/documents/{doc_uuid} | document:7f0c2a9e-0d6b-4a57-9a1e-1b2c3d4e5f02",
+    "bola | omar | GET /v2/documents | -",
+    "bola | omar | GET /v2/documents/{doc_uuid} | document:7f0c2a9e-0d6b-4a57-9a1e-1b2c3d4e5f01",
+    "bopla | nina | GET /v2/documents/{doc_uuid} | document:7f0c2a9e-0d6b-4a57-9a1e-1b2c3d4e5f01",
+    "bopla | omar | GET /v2/documents/{doc_uuid} | document:7f0c2a9e-0d6b-4a57-9a1e-1b2c3d4e5f02",
+    "bopla | pia | GET /v2/documents/{doc_uuid} | document:7f0c2a9e-0d6b-4a57-9a1e-1b2c3d4e5f03",
+    "tenant | nina | GET /v2/workspaces/{workspace}/invoices/{number} | invoice:ws-south/1001",
+    "tenant | omar | GET /v2/workspaces/{workspace}/invoices/{number} | invoice:ws-south/1001",
+    "tenant | pia | GET /v2/workspaces/{workspace}/invoices/{number} | invoice:ws-north/1001",
+    "tenant | pia | GET /v2/workspaces/{workspace}/invoices/{number} | invoice:ws-north/1002"
+  ]
+}

@@ -1,6 +1,6 @@
 """Authorization gate for CI: AuthScope must be right on BOTH sides.
 
-    python scripts/ci_gate.py --secure http://127.0.0.1:8000 --vulnerable http://127.0.0.1:8001 [--out reports/]
+    python scripts/ci_gate.py [--stand demo|ledger] --secure URL --vulnerable URL [--out reports/]
 
 1. Secure demo (DEMO_VULNS=):        zero violations, zero needs-review, zero errors.
 2. Vulnerable demo (all flaws on):   exactly the findings listed in examples/expected-findings.json
@@ -33,10 +33,16 @@ from authscope.models import CheckResult, RunInfo  # noqa: E402
 from authscope.runner import TestRunner  # noqa: E402
 from authscope.storage import now  # noqa: E402
 
-CONFIG = ROOT / "examples" / "demo.authscope.yaml"
-ENV = ROOT / "examples" / "demo.env"
-EXPECTED = ROOT / "examples" / "expected-findings.json"
-MODULES = ["unauth", "bola", "bfla", "bopla", "tenant", "custom"]
+STANDS = {
+    # stand: (config, credentials, expected findings, modules)
+    "demo": ("demo.authscope.yaml", "demo.env", "expected-findings.json",
+             ["unauth", "bola", "bfla", "bopla", "tenant", "custom"]),
+    "ledger": ("ledger.authscope.yaml", "ledger.env", "expected-findings-ledger.json",
+               ["unauth", "bola", "bfla", "bopla", "tenant"]),
+}
+CONFIG = ENV = EXPECTED = Path()
+MODULES: list[str] = []
+STAND_PREFIX = [""]
 
 
 def load_env() -> dict[str, str]:
@@ -77,7 +83,7 @@ def render_all(cfg, info, results, out: Path | None, name: str) -> dict[str, str
     if out:
         out.mkdir(parents=True, exist_ok=True)
         for ext, text in texts.items():
-            (out / f"{name}.{ext}").write_text(text, encoding="utf-8")
+            (out / f"{STAND_PREFIX[0]}{name}.{ext}").write_text(text, encoding="utf-8")
     return texts
 
 
@@ -87,7 +93,13 @@ def main() -> int:
     ap.add_argument("--vulnerable", required=True)
     ap.add_argument("--out", type=Path)
     ap.add_argument("--write-expected", action="store_true")
+    ap.add_argument("--stand", choices=sorted(STANDS), default="demo")
     args = ap.parse_args()
+    global CONFIG, ENV, EXPECTED, MODULES
+    cfg_name, env_name, exp_name, MODULES = STANDS[args.stand]
+    CONFIG, ENV, EXPECTED = (ROOT / "examples" / n for n in (cfg_name, env_name, exp_name))
+    STAND_PREFIX[0] = "" if args.stand == "demo" else f"{args.stand}-"
+    print(f"stand: {args.stand}")
     secrets = [v for v in load_env().values() if v]
     failures: list[str] = []
 
@@ -128,10 +140,15 @@ def main() -> int:
         if res is None or ev is None or ev.test is None:
             failures.append(f"[evidence] missing evidence for {key(r)}")
             continue
-        if f"/{res.id}" not in ev.test.url.split("?")[0]:
+        path = ev.test.url.split("?")[0]
+        segments = list(res.params.values()) or [res.id]
+        if not all(f"/{seg}" in path for seg in segments):
             failures.append(f"[evidence] test request does not target {r.resource}: {ev.test.url}")
         body = ev.test.response_body or ""
-        if res.id_field not in body or str(res.id) not in body:
+        if res.match:
+            if not all(str(val) in body for val in res.match.values()):
+                failures.append(f"[evidence] response body of {key(r)} does not satisfy the match rules")
+        elif res.id_field not in body or str(res.id) not in body:
             failures.append(f"[evidence] response body of {key(r)} does not contain {res.id_field}={res.id}")
         if ev.baseline and res.owner and ev.baseline.identity != res.owner:
             failures.append(f"[evidence] baseline of {key(r)} made by {ev.baseline.identity}, owner is {res.owner}")

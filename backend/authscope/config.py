@@ -166,6 +166,14 @@ class Resource(BaseModel):
     # Composite / custom identification: JSONPath -> expected value. When set, a response "contains this
     # object" only if every rule matches (instead of looking for id_field == id).
     match: dict[str, str] = Field(default_factory=dict)
+    # Explicit path parameter values for objects addressed by several segments,
+    # e.g. {"workspace": "ws-north", "number": "1001"} for /workspaces/{workspace}/invoices/{number}
+    params: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("params", mode="before")
+    @classmethod
+    def _params(cls, v: Any) -> Any:
+        return {k: str(val) for k, val in v.items()} if isinstance(v, dict) else v
 
     @field_validator("id", mode="before")
     @classmethod
@@ -344,8 +352,10 @@ class ProjectConfig(BaseModel):
         parameter's type owned by the same identity. Unresolvable parameters are left out.
         """
         values = dict(ep.params)
+        if res is not None:
+            values.update({k: v for k, v in res.params.items() if k in ep.path_params})
         bound = ep.bound_param
-        if res is not None and bound:
+        if res is not None and bound and bound not in values:
             values[bound] = res.id
         chain: list[Resource] = []
         cur = res

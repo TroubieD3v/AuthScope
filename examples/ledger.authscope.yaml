@@ -1,0 +1,65 @@
+# AuthScope config for the independent ledger test stand (python -m ledger_api, port 8100).
+# Credentials come from environment variables (see examples/ledger.env for the throwaway values).
+#
+#   set -a; . examples/ledger.env; set +a
+#   authscope run -c examples/ledger.authscope.yaml -f md -o ledger-report.md
+#
+# Differences from the demo API that this stand exercises: API keys in a header, UUID ids under "uuid",
+# {"data": ...} envelopes, refusals sent as HTTP 200 with an "errors" array, paginated lists, and invoices
+# identified by (workspace, number) where the numbers repeat across workspaces.
+name: Ledger test stand
+
+target:
+  base_url: http://127.0.0.1:8100
+  allowed_hosts: [127.0.0.1]
+  rate_limit_rps: 20
+  max_requests: 400
+
+identities:
+  - { name: guest, role: guest }
+  - { name: nina, role: member, tenant: ws-north, auth: { type: header, header_name: X-Api-Key } }
+  - { name: omar, role: member, tenant: ws-north, auth: { type: header, header_name: X-Api-Key } }
+  - { name: pia,  role: member, tenant: ws-south, auth: { type: header, header_name: X-Api-Key } }
+  - { name: root, role: admin,  auth: { type: header, header_name: X-Api-Key } }
+
+resources:
+  - { type: document, id: 7f0c2a9e-0d6b-4a57-9a1e-1b2c3d4e5f01, owner: nina, id_field: uuid }
+  - { type: document, id: 7f0c2a9e-0d6b-4a57-9a1e-1b2c3d4e5f02, owner: omar, id_field: uuid }
+  - { type: document, id: 7f0c2a9e-0d6b-4a57-9a1e-1b2c3d4e5f03, owner: pia,  id_field: uuid }
+  # composite identity: the number alone is not unique, so path params and match rules carry both parts
+  - type: invoice
+    id: ws-north/1001
+    owner: nina
+    tenant: ws-north
+    params: { workspace: ws-north, number: 1001 }
+    match: { "$.data.workspace": ws-north, "$.data.number": "1001" }
+  - type: invoice
+    id: ws-north/1002
+    owner: omar
+    tenant: ws-north
+    params: { workspace: ws-north, number: 1002 }
+    match: { "$.data.workspace": ws-north, "$.data.number": "1002" }
+  - type: invoice
+    id: ws-south/1001
+    owner: pia
+    tenant: ws-south
+    params: { workspace: ws-south, number: 1001 }
+    match: { "$.data.workspace": ws-south, "$.data.number": "1001" }
+
+endpoints:
+  - { method: GET, path: /v2/health, access: public }
+  - { method: GET, path: /v2/me, access: authenticated }
+  - { method: GET, path: /v2/documents, access: authenticated, list_of: document, query: { page: "1" } }
+  - method: GET
+    path: "/v2/documents/{doc_uuid}"
+    access: owner
+    allow_roles: [admin]
+    resource_type: document
+    restricted_fields: [ { name: costCenter, roles: [admin] } ]
+  - method: GET
+    path: "/v2/workspaces/{workspace}/invoices/{number}"
+    access: tenant
+    allow_roles: [admin]
+    resource_type: invoice
+    param_types: { workspace: workspace, number: invoice }
+  - { method: GET, path: /v2/admin/audit-log, access: roles, allow_roles: [admin] }
