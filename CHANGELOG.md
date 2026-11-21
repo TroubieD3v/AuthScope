@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Interface redesign in the layout of a desktop scanner: tool tabs instead of a sidebar, a status bar with the
+  target and safety mode, dense tables, and a findings view with the results table, the baseline and test
+  exchanges side by side (request / response tabs, line numbers, highlighting) and an inspector with the expected
+  policy, analysis and reproduction. Softer graphite dark theme and a light theme, IBM Plex Sans and Mono.
+  The HTML report follows the same design. Screenshots and the demo GIF are regenerated.
+
 ## 1.5.0
 
 - Independent second test stand `ledger_api` with different API conventions: API keys in a header, UUIDs,

@@ -2,28 +2,25 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const tones = {
-  bad: "bg-bad/14 text-bad",
-  warn: "bg-warn/15 text-warn",
-  ok: "bg-accent/14 text-accent",
-  info: "bg-info/14 text-info",
-  mute: "bg-panel2 text-mute",
-  accent: "bg-accent/14 text-accent",
-  ink: "bg-primary text-on-primary",
+  bad: "border-bad/40 bg-bad/12 text-bad",
+  warn: "border-warn/40 bg-warn/12 text-warn",
+  ok: "border-ok/40 bg-ok/10 text-ok",
+  info: "border-line text-info",
+  mute: "border-line text-mute",
+  accent: "border-accent/40 text-accent",
+  ink: "border-line text-ink",
 };
 
-/** Rounded pill with an uppercase label ("OPTIMIZED", "WEEKLY INSIGHT"). */
+/** Small flat label. */
 export function Badge({ tone = "mute", className, ...props }: HTMLAttributes<HTMLSpanElement> & { tone?: keyof typeof tones }) {
   return (
     <span
-      className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em]", tones[tone], className)}
+      className={cn("inline-flex items-center gap-1 whitespace-nowrap border px-1.5 text-[11px] font-medium leading-[18px]", tones[tone], className)}
       {...props}
     />
   );
 }
 
-const methodColors: Record<string, string> = {
-  GET: "text-info", POST: "text-accent", PUT: "text-warn", PATCH: "text-warn", DELETE: "text-bad",
-};
 export const Method = ({ m }: { m: string }) => (
-  <span className={cn("inline-block w-14 font-mono text-xs font-bold", methodColors[m] ?? "text-mute")}>{m}</span>
+  <span className={cn("inline-block w-14 font-mono text-[11.5px]", m === "DELETE" ? "text-bad" : "text-mute")}>{m}</span>
 );

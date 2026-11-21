@@ -1,56 +1,43 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { Verdict } from "@/lib/api";
-import { cn, VERDICT_META } from "@/lib/utils";
+import { VERDICT_META } from "@/lib/utils";
 
-/** Editorial page header: a status pill, a large headline and a lead paragraph. */
-export function PageHeader({ title, hint, actions, kicker, kickerTone = "accent" }: {
+/** Screen toolbar: title, an optional state label, one line of context and the screen's actions. */
+export function PageHeader({ title, hint, actions, kicker, kickerTone = "mute" }: {
   title: string; hint?: ReactNode; actions?: ReactNode; kicker?: string;
-  kickerTone?: "accent" | "warn" | "bad" | "mute" | "info";
+  kickerTone?: "accent" | "warn" | "bad" | "mute" | "info" | "ok";
 }) {
   return (
-    <section className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-      <div className="max-w-2xl">
-        {kicker && <Badge tone={kickerTone} className="mb-4">{kicker}</Badge>}
-        <h1 className="font-display text-4xl font-semibold leading-none tracking-[-0.03em] md:text-5xl">{title}</h1>
-        {hint && <p className="mt-4 text-[15px] leading-relaxed text-mute">{hint}</p>}
+    <section className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <h1 className="text-[15px] font-semibold">{title}</h1>
+          {kicker && <Badge tone={kickerTone}>{kicker}</Badge>}
+        </div>
+        {hint && <p className="mt-0.5 max-w-4xl text-xs text-mute">{hint}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-1.5">{actions}</div>}
     </section>
   );
 }
 
 export const VerdictBadge = ({ v }: { v: Verdict }) => <Badge tone={VERDICT_META[v].tone}>{VERDICT_META[v].label}</Badge>;
 
-/** Two concentric rings, like the reference dashboard dial. Values are 0..1. */
-export function Dial({ outer, inner, children, className }: { outer: number; inner: number; children: ReactNode; className?: string }) {
-  const C = 2 * Math.PI * 45;
-  return (
-    <div className={cn("relative grid size-72 place-items-center md:size-80", className)}>
-      <div className="absolute inset-6 rounded-full bg-accent/10 blur-3xl" />
-      <svg className="absolute size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="50" r="45" fill="none" stroke="var(--surface-container)" strokeWidth="5" />
-        <circle cx="50" cy="50" r="45" fill="none" stroke="var(--accent)" strokeWidth="5" strokeLinecap="round"
-          strokeDasharray={C} strokeDashoffset={C * (1 - outer)} style={{ transition: "stroke-dashoffset .8s ease" }} />
-      </svg>
-      <svg className="absolute size-3/4 -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="50" r="45" fill="none" stroke="var(--surface-high)" strokeWidth="7" />
-        <circle cx="50" cy="50" r="45" fill="none" stroke="var(--bad)" strokeWidth="7" strokeLinecap="round"
-          strokeDasharray={C} strokeDashoffset={C * (1 - inner)} style={{ transition: "stroke-dashoffset .8s ease" }} />
-      </svg>
-      <div className="relative z-10 text-center">{children}</div>
-    </div>
-  );
-}
-
 export function SectionTitle({ title, hint, actions }: { title: string; hint?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="flex items-end justify-between gap-4 px-1">
+    <div className="flex items-end justify-between gap-4">
       <div>
-        <h2 className="font-display text-2xl font-bold tracking-tight">{title}</h2>
-        {hint && <p className="mt-0.5 text-sm text-mute">{hint}</p>}
+        <h2 className="text-[13px] font-semibold">{title}</h2>
+        {hint && <p className="text-xs text-mute">{hint}</p>}
       </div>
       {actions}
     </div>
   );
+}
+
+/** Small square that encodes severity in tables. */
+export function SevMark({ s }: { s: string }) {
+  const cls = s === "critical" || s === "high" ? "bg-bad" : s === "medium" ? "bg-warn" : s === "low" ? "bg-info" : "border border-dim";
+  return <span className={`mr-1.5 inline-block size-2 align-[1px] ${cls}`} />;
 }

@@ -48,11 +48,11 @@ export function Explorer() {
     (e.method + " " + e.path + " " + (e.summary ?? "") + " " + e.tags.join(" ")).toLowerCase().includes(filter.toLowerCase()));
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-3">
       <PageHeader kicker="Inventory" title="API Explorer"
-        hint={<>Your target, spec import and <span className="font-semibold text-accent">{project.endpoints.length} endpoints</span> with their access rules. Specs say how to authenticate, not who owns what, so imported rules stay marked <i>inferred</i> until you confirm them.</>} />
+        hint={<>Your target, spec import and <span className="font-semibold text-ink">{project.endpoints.length} endpoints</span> with their access rules. Specs say how to authenticate, not who owns what, so imported rules stay marked <i>inferred</i> until you confirm them.</>} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <Card>
           <CardHeader title="Target" hint="The engine only contacts hosts in this list." />
           <CardBody className="space-y-3">
@@ -71,7 +71,7 @@ export function Explorer() {
             <Textarea rows={2} placeholder="...or paste a spec / collection here" value={specText} onChange={(e) => setSpecText(e.target.value)} />
             <div className="flex gap-2">
               <Button variant="secondary" size="sm" disabled={!specText.trim()} onClick={() => doImport({ content: specText })}>Import pasted</Button>
-              <label className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[3px] bg-panel2 px-3 text-xs font-semibold hover:bg-high">
+              <label className="inline-flex h-7 cursor-pointer items-center gap-1.5 bg-panel2 px-3 text-xs font-semibold hover:bg-high">
                 <FileUp className="size-3.5" /> From file
                 <input type="file" hidden accept=".json,.yaml,.yml" onChange={async (e) => { const f = e.target.files?.[0]; if (f) doImport({ content: await f.text() }); e.target.value = ""; }} />
               </label>
@@ -85,13 +85,13 @@ export function Explorer() {
         <CardHeader title={`Endpoints (${project.endpoints.length})`}
           hint="OpenAPI cannot say who owns what - confirm the inferred access rules (marked 'inferred')."
           actions={<Input className="h-8 w-56" placeholder="Filter..." value={filter} onChange={(e) => setFilter(e.target.value)} />} />
-        <div className="mx-3 mb-3 divide-y divide-line/60 overflow-hidden rounded-2xl bg-panel2/60">
-          {endpoints.length === 0 && <p className="px-5 py-6 text-sm text-mute">No endpoints yet - import a spec or add one below.</p>}
+        <div className="mx-3 mb-3 divide-y divide-line2 overflow-hidden bg-panel">
+          {endpoints.length === 0 && <p className="px-3 py-6 text-sm text-mute">No endpoints yet - import a spec or add one below.</p>}
           {endpoints.map((ep) => {
             const key = `${ep.method} ${ep.path}`;
             return (
               <div key={key}>
-                <button onClick={() => setOpen(open === key ? null : key)} className="flex w-full cursor-pointer items-center gap-3 px-5 py-2.5 text-left hover:bg-panel2/50">
+                <button onClick={() => setOpen(open === key ? null : key)} className="flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left hover:bg-panel2/50">
                   {open === key ? <ChevronDown className="size-4 text-mute" /> : <ChevronRight className="size-4 text-mute" />}
                   <Method m={ep.method} />
                   <span className={`font-mono text-[13px] ${ep.enabled ? "" : "text-mute line-through"}`}>{ep.path}</span>
@@ -141,7 +141,7 @@ function EndpointEditor({ ep, onDone }: { ep: Endpoint; onDone: () => void }) {
   }, "Endpoint saved");
 
   return (
-    <div className="grid grid-cols-3 gap-4 bg-panel2/40 px-5 py-4">
+    <div className="grid grid-cols-3 gap-4 bg-panel2/40 px-3 py-4">
       <Field label="Access rule" hint={ACCESS.find((a) => a.v === d.access)?.hint}>
         <Select value={d.access} onChange={(e) => setD({ ...d, access: e.target.value as Access })}>
           {ACCESS.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}</Select>

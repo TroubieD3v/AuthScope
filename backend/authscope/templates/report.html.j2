@@ -3,34 +3,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AuthScope report - {{ d.project }}</title>
 <style>
- :root{--bg:#f4f7fc;--panel:#fff;--panel2:#e8effa;--line:#d3dceb;--text:#121212;--mute:#64748b;--bad:#c62828;--warn:#b45f06;--ok:#008542;--code:#eef3fb;--inv:#1e293b}
- .dark{--bg:#0d0d0e;--panel:#161617;--panel2:#1d1e20;--line:#2e3033;--text:#f3f3f2;--mute:#94a3b8;--bad:#f2716b;--warn:#f59a3c;--ok:#3fbf75;--code:#0d0d0e;--inv:#233046}
- *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 Inter,system-ui,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
- main{max-width:1040px;margin:0 auto;padding:40px 24px 80px}
- h1,h2,h3,.num{font-family:Manrope,Inter,system-ui,sans-serif;letter-spacing:-.02em}
- h1{font-size:44px;line-height:1;margin:14px 0 10px;font-weight:600} h2{font-size:24px;margin:48px 0 16px}
- .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px}
- .brand{display:flex;align-items:center;gap:10px;font:700 18px Manrope,Inter,sans-serif}
- .mark{width:34px;height:34px;border-radius:3px;background:var(--text);color:var(--bg);display:grid;place-items:center;font-size:16px}
- .toggle{cursor:pointer;border:0;background:var(--panel2);color:var(--text);border-radius:3px;padding:8px 12px;font:600 12px Inter,sans-serif}
+ :root{--bg:#eef0f2;--panel:#f8f9fa;--panel2:#e8ebee;--line:#cdd3d9;--line2:#e1e5e9;--text:#1e2227;--mute:#5b626a;--bad:#a8402f;--warn:#87601a;--ok:#3b6a4a;--acc:#2c5d8a;--code:#f8f9fa}
+ .dark{--bg:#191b1e;--panel:#1f2226;--panel2:#24272c;--line:#2f333a;--line2:#25282d;--text:#d5d7da;--mute:#8d939a;--bad:#d98577;--warn:#d0a866;--ok:#94b08e;--acc:#8fb4d8;--code:#191b1e}
+ *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 'IBM Plex Sans',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum"}
+ main{max-width:1080px;margin:0 auto;padding:28px 24px 64px}
+ h1,h2,h3{font-family:'IBM Plex Sans',system-ui,'Segoe UI',sans-serif;font-weight:600;letter-spacing:0}
+ h1{font-size:20px;line-height:1.2;margin:10px 0 4px} h2{font-size:14px;margin:32px 0 10px}
+ .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+ .brand{display:flex;align-items:center;gap:8px;font:600 13px 'IBM Plex Sans',system-ui,'Segoe UI',sans-serif}
+ .mark{width:18px;height:18px;color:var(--acc);display:grid;place-items:center;font-size:13px}
+ .toggle{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:4px 10px;font:500 12px 'IBM Plex Sans',system-ui,'Segoe UI',sans-serif}
  .mute{color:var(--mute)}
- .pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--panel2);color:var(--mute);margin-right:6px}
- .pill.violation,.pill.bad{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
- .pill.needs_review,.pill.warn{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
- .pill.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
- .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:28px 0}
- .card{background:var(--panel2);border-radius:18px;padding:18px 20px}
- .card .lbl{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
- .card .num{display:block;font-size:34px;font-weight:700;margin-top:6px}
- .finding{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:22px 24px;margin:16px 0}
- .finding h3{margin:10px 0 2px;font-size:18px}
- pre{background:var(--code);border:1px solid var(--line);border-radius:14px;padding:12px;overflow:auto;font:12px/1.5 "JetBrains Mono",ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
- .xlbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:14px 0 6px}
- table{border-collapse:collapse;width:100%;background:var(--panel);border-radius:18px;overflow:hidden} td,th{border-bottom:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
- th{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
- details{margin:10px 0} summary{cursor:pointer;color:var(--mute);font-weight:600}
- .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.cols,.cards{grid-template-columns:1fr 1fr}}
- code{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace}
+ .pill{display:inline-block;padding:0 6px;line-height:18px;font-size:11px;font-weight:500;border:1px solid var(--line);color:var(--mute);margin-right:4px}
+ .pill.violation,.pill.bad{border-color:color-mix(in srgb,var(--bad) 40%,transparent);background:color-mix(in srgb,var(--bad) 12%,transparent);color:var(--bad)}
+ .pill.needs_review,.pill.warn{border-color:color-mix(in srgb,var(--warn) 40%,transparent);background:color-mix(in srgb,var(--warn) 12%,transparent);color:var(--warn)}
+ .pill.ok{border-color:color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 10%,transparent);color:var(--ok)}
+ .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin:16px 0}
+ .card{background:var(--panel);padding:8px 12px}
+ .card .lbl{font-size:12px;color:var(--mute)}
+ .card .num{display:block;font:500 20px 'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;margin-top:2px}
+ .finding{background:var(--panel);border:1px solid var(--line);padding:12px 14px;margin:10px 0}
+ .finding.violation{box-shadow:inset 3px 0 0 var(--bad)} .finding.needs_review{box-shadow:inset 3px 0 0 var(--warn)}
+ .finding h3{margin:6px 0 2px;font:500 13px 'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace}
+ pre{background:var(--code);border:1px solid var(--line);padding:8px 10px;overflow:auto;font:12px/1.55 'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+ .xlbl{font-size:12px;color:var(--mute);margin:12px 0 4px}
+ table{border-collapse:collapse;width:100%;background:var(--panel);border:1px solid var(--line)} td,th{border-bottom:1px solid var(--line2);padding:5px 10px;text-align:left;vertical-align:top}
+ th{font-size:12px;font-weight:500;color:var(--mute);background:var(--panel2);border-bottom-color:var(--line)}
+ details{margin:8px 0} summary{cursor:pointer;color:var(--mute);font-weight:500}
+ .cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:800px){.cols,.cards{grid-template-columns:1fr 1fr}}
+ code{font-family:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace}
 </style></head><body><main>
 <div class="top"><div class="brand"><div class="mark">&#x2713;</div>AuthScope</div>
 <button class="toggle" onclick="document.documentElement.classList.toggle('dark')">Light / dark</button></div>

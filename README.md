@@ -86,8 +86,9 @@ Test      bob   -> GET /api/orders/101   ?
 6. **Run** and read the matrix, the findings and the reports (HTML, Markdown, JSON, pytest).
 
 The interface has six screens: Dashboard, API Explorer, Identity Manager, Permission Matrix, Test Runner, and
-Findings & Reports, in a dark (default) and a light theme. Palette: primary `#121212`, secondary `#008542`,
-tertiary `#D97706`, neutral `#64748B`; headlines in Manrope, body in Inter (fonts are bundled, no CDN).
+Findings & Reports, in a dark (default) and a light theme. The layout follows desktop scanners: tool tabs, dense
+tables, the baseline and test exchanges side by side with request / response tabs, an inspector and a status bar.
+IBM Plex Sans and Plex Mono are bundled (no CDN); colour marks data only.
 
 | API Explorer | Identity Manager |
 |---|---|
