@@ -7,7 +7,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # --- backend + built UI -------------------------------------------------------
-FROM python:3.12-slim
+FROM python:3.15-slim
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 AUTHSCOPE_DB=/data/authscope.db AUTHSCOPE_STATIC=/app/ui
 WORKDIR /app
 COPY pyproject.toml README.md ./
