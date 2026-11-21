@@ -2,21 +2,21 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-// Square controls, as in the design palette: Primary, Secondary, Inverted, Outlined (+ accent, danger, ghost).
+// Compact desktop controls: one filled primary action, bordered secondary ones.
 const variants = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[3px] text-sm font-semibold transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40",
+  "inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap border text-[12.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40",
   {
     variants: {
       variant: {
-        default: "bg-primary text-on-primary hover:opacity-85",
-        accent: "bg-accent-solid text-white hover:brightness-110 shadow-[0_10px_24px_-12px_rgb(0_133_66/0.7)]",
-        secondary: "bg-panel2 text-ink hover:bg-high",
-        inverted: "bg-inverse text-on-inverse hover:brightness-110",
-        outline: "border border-mute/60 text-ink hover:border-ink",
-        ghost: "text-mute hover:bg-panel2 hover:text-ink",
-        danger: "bg-bad-solid text-white hover:brightness-110",
+        default: "border-accent-solid bg-accent-solid text-white hover:brightness-110",
+        accent: "border-accent-solid bg-accent-solid text-white hover:brightness-110",
+        secondary: "border-line bg-panel text-ink hover:border-dim",
+        inverted: "border-line bg-panel text-ink hover:border-dim",
+        outline: "border-line text-ink hover:border-dim",
+        ghost: "border-transparent text-mute hover:bg-panel2 hover:text-ink",
+        danger: "border-bad-solid bg-bad-solid text-white hover:brightness-110",
       },
-      size: { default: "h-10 px-5", sm: "h-8 px-3 text-xs", icon: "size-9" },
+      size: { default: "h-8 px-3", sm: "h-7 px-2.5 text-xs", icon: "size-7" },
     },
     defaultVariants: { variant: "default", size: "default" },
   },

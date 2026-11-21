@@ -90,8 +90,9 @@ Test      bob   -> GET /api/orders/101   ?
 6. **Запуск**: матрица, находки и отчёты (HTML, Markdown, JSON, pytest).
 
 В интерфейсе шесть экранов: Dashboard, API Explorer, Identity Manager, Permission Matrix, Test Runner и
-Findings & Reports, в тёмной (по умолчанию) и светлой теме. Палитра: primary `#121212`, secondary `#008542`,
-tertiary `#D97706`, neutral `#64748B`; заголовки — Manrope, текст — Inter (шрифты встроены, без CDN).
+Findings & Reports, в тёмной (по умолчанию) и светлой теме. Раскладка как у десктопных сканеров: вкладки
+инструментов, плотные таблицы, обмены baseline и test рядом с вкладками запрос / ответ, инспектор и строка
+состояния. Шрифты IBM Plex Sans и Plex Mono встроены (без CDN); цветом отмечены только данные.
 
 | API Explorer | Identity Manager |
 |---|---|

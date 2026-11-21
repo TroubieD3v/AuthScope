@@ -67,7 +67,7 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  if (projects === null) return <div className="grid h-full place-items-center text-mute">Loading...</div>;
+  if (projects === null) return <div className="grid h-screen place-items-center text-mute">Loading...</div>;
   if (creating || !pid || !project) {
     return (
       <Onboarding
@@ -85,75 +85,65 @@ export default function App() {
     const list = await loadProjects();
     setPid(list[0]?.id ?? null);
   };
+  const t = project.target;
 
   return (
     <Ctx.Provider value={{ project, reload, go, notify, focusRun, setFocusRun }}>
-      {/* Top app bar */}
-      <header className="sticky top-0 z-40 border-b border-line/60 bg-bg/75 backdrop-blur-xl">
-        <div className="mx-auto flex h-[68px] max-w-[1400px] items-center justify-between gap-4 px-5 lg:px-8">
-          <Logo />
-          <div className="flex items-center gap-2">
-            <select
-              value={pid}
-              aria-label="Project"
-              onChange={(e) => e.target.value === "__new" ? setCreating(true) : setPid(e.target.value)}
-              className="hidden h-9 max-w-[16rem] cursor-pointer rounded-[3px] border border-line bg-panel2/70 px-3 text-xs font-medium sm:block"
+      {/* Tool tabs */}
+      <header className="sticky top-0 z-40 flex h-9 items-stretch border-b border-line bg-chrome">
+        <div className="flex items-center border-r border-line px-3"><Logo /></div>
+        <nav className="hidden items-stretch lg:flex">
+          {NAV.map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => go(id)}
+              className={cn(
+                "cursor-pointer whitespace-nowrap px-3.5 text-[12.5px] transition-colors",
+                screen === id ? "bg-bg text-ink shadow-[inset_0_-2px_0_var(--accent)]" : "text-mute hover:bg-panel2/60 hover:text-ink",
+              )}
             >
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              <option value="__new">+ New project...</option>
-            </select>
-            <ThemeToggle />
-          </div>
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="ml-auto flex items-center gap-1.5 px-2">
+          <select
+            value={pid}
+            aria-label="Project"
+            onChange={(e) => e.target.value === "__new" ? setCreating(true) : setPid(e.target.value)}
+            className="hidden h-7 max-w-[16rem] cursor-pointer border border-line bg-bg px-2 text-xs sm:block"
+          >
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            <option value="__new">+ New project...</option>
+          </select>
+          <ThemeToggle />
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-[1400px]">
-        {/* Desktop rail */}
-        <aside className="sticky top-[68px] hidden h-[calc(100vh-68px)] w-64 shrink-0 flex-col justify-between px-5 py-8 lg:flex">
-          <nav className="space-y-1.5">
-            {NAV.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => go(id)}
-                className={cn(
-                  "group flex w-full cursor-pointer items-center gap-3 rounded-[3px] px-2 py-1.5 text-left text-[13.5px] font-medium transition-colors",
-                  screen === id ? "text-ink" : "text-mute hover:text-ink",
-                )}
-              >
-                <span className={cn(
-                  "grid size-9 place-items-center rounded-[3px] transition-colors",
-                  screen === id ? "bg-primary text-on-primary" : "group-hover:bg-panel2",
-                )}>
-                  <Icon className="size-[18px]" />
-                </span>
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="space-y-3 rounded-2xl bg-panel2 p-4">
-            <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-mute">Target</div>
-            <div className="truncate font-mono text-xs" title={project.target.base_url}>{project.target.base_url}</div>
-            <button onClick={deleteProject} className="flex cursor-pointer items-center gap-1.5 text-[11px] text-mute hover:text-bad">
-              <Trash2 className="size-3" /> Delete project
-            </button>
-          </div>
-        </aside>
+      <main className="min-w-0 px-4 pb-24 pt-3 lg:pb-12">
+        <View />
+      </main>
 
-        <main className="min-w-0 flex-1 px-5 pb-32 pt-8 lg:px-10 lg:pb-16">
-          <div className="mx-auto max-w-[1080px]"><View /></div>
-        </main>
-      </div>
+      {/* Status bar */}
+      <footer className="fixed inset-x-0 bottom-0 z-40 hidden h-6 items-center gap-5 border-t border-line bg-chrome px-3 text-[11.5px] text-mute lg:flex">
+        <span>project <b className="font-medium text-ink">{project.name}</b></span>
+        <span>target <span className="font-mono text-ink">{t.base_url}</span></span>
+        <span>{t.allowed_hosts.length} host{t.allowed_hosts.length === 1 ? "" : "s"} allowed</span>
+        <span>{t.rate_limit_rps} req/s · budget {t.max_requests}</span>
+        <span className={t.allow_mutating ? "text-warn" : ""}>{t.allow_mutating ? "state-changing requests on" : "read-only"}</span>
+        <button onClick={deleteProject} className="ml-auto flex cursor-pointer items-center gap-1 hover:text-bad">
+          <Trash2 className="size-3" /> Delete project
+        </button>
+      </footer>
 
-      {/* Mobile bottom navigation */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line/60 bg-bg/85 backdrop-blur-xl lg:hidden">
-        <div className="mx-auto flex max-w-xl items-center justify-between px-3 py-2">
+      {/* Mobile tool switcher */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-chrome lg:hidden">
+        <div className="mx-auto flex max-w-xl items-center justify-between px-2 py-1">
           {NAV.map(({ id, short, icon: Icon }) => (
             <button key={id} onClick={() => go(id)} aria-label={short}
-              className={cn("flex cursor-pointer flex-col items-center gap-1 px-1.5 py-1", screen === id ? "text-ink" : "text-mute")}>
-              <span className={cn("grid size-9 place-items-center rounded-[3px]", screen === id && "bg-primary text-on-primary")}>
-                <Icon className="size-[18px]" />
-              </span>
-              <span className="text-[9.5px] font-bold uppercase tracking-[0.1em]">{short}</span>
+              className={cn("flex cursor-pointer flex-col items-center gap-0.5 px-1.5 py-1", screen === id ? "text-accent" : "text-mute")}>
+              <Icon className="size-[17px]" />
+              <span className="text-[10px]">{short}</span>
             </button>
           ))}
         </div>
@@ -163,8 +153,8 @@ export default function App() {
         <div
           role="status"
           className={cn(
-            "fixed bottom-24 right-5 z-50 max-w-md rounded-2xl px-5 py-3.5 text-sm font-medium shadow-2xl lg:bottom-6",
-            toast.kind === "ok" ? "bg-accent-solid text-white" : "bg-bad-solid text-white",
+            "fixed bottom-20 right-3 z-50 max-w-md border border-line bg-panel px-3 py-2 text-[12.5px] lg:bottom-9",
+            toast.kind === "ok" ? "shadow-[inset_3px_0_0_var(--accent)]" : "text-bad shadow-[inset_3px_0_0_var(--bad)]",
           )}
         >
           {toast.msg}

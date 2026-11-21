@@ -47,27 +47,27 @@ export function Identities() {
   const owners = project.identities.filter((i) => i.auth.type !== "none");
 
   return (
-    <div className="space-y-12">
-      <PageHeader kicker="Test accounts" title="Identity Manager"
+    <div className="space-y-3">
+      <PageHeader kicker="Test accounts" kickerTone="mute" title="Identity Manager"
         hint={<>Who AuthScope acts as, and which objects belong to whom. Tokens are <span className="font-semibold text-ink">write-only</span>:
           kept in server memory for this session and never saved to the database, config or reports.</>} />
 
-      <section className="space-y-6">
+      <section className="space-y-2">
         <SectionTitle title="Test identities" hint="Or export the environment variable shown on a card before starting AuthScope." />
-        <div className="grid gap-5 md:grid-cols-2">
-          {project.identities.length === 0 && <p className="rounded-3xl bg-panel2 p-6 text-sm text-mute">Add at least two user identities and one admin.</p>}
+        <div className="grid gap-3 md:grid-cols-2">
+          {project.identities.length === 0 && <p className=" border border-line bg-panel p-3 text-xs text-mute">Add at least two user identities and one admin.</p>}
           {project.identities.map((i) => {
             const src = SOURCE_LABEL[i.secret_source ?? "missing"];
             const anon = i.auth.type === "none";
             return (
-              <div key={i.name} className="flex flex-col gap-5 rounded-3xl bg-panel2 p-6">
+              <div key={i.name} className="flex flex-col gap-2.5 border border-line bg-panel p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-4">
-                    <div className={anon ? "grid size-12 place-items-center rounded-[3px] bg-high text-mute" : "grid size-12 place-items-center rounded-[3px] bg-primary font-display text-lg font-bold text-on-primary"}>
+                    <div className={anon ? "grid size-8 place-items-center border border-line text-mute" : "grid size-8 place-items-center border border-line font-mono text-[13px] text-ink"}>
                       {anon ? <UserRound className="size-5" /> : i.name.slice(0, 1).toUpperCase()}
                     </div>
                     <div>
-                      <div className="font-display text-xl font-bold tracking-tight">{i.name}</div>
+                      <div className="text-[13px] font-semibold">{i.name}</div>
                       <div className="mt-0.5 text-xs text-mute">
                         role <span className="font-mono text-ink">{i.role}</span>{i.tenant && <> · tenant <span className="font-mono text-ink">{i.tenant}</span></>}
                       </div>
@@ -137,12 +137,12 @@ export function Identities() {
         </Card>
       </section>
 
-      <section className="space-y-6">
+      <section className="space-y-2">
         <SectionTitle title="Test objects and their owners" hint="BOLA tests compare the owner's request with other identities requesting the same object." />
         <Card>
           <div className="overflow-x-auto px-3 pt-3">
             <table className="w-full text-left text-sm">
-              <thead className="text-[11px] uppercase tracking-[0.12em] text-mute"><tr>
+              <thead className="text-xs text-mute"><tr>
                 <th className="px-4 py-3 font-semibold">Type</th><th className="font-semibold">Object id</th><th className="font-semibold">Owner</th>
                 <th className="font-semibold">Tenant</th><th className="font-semibold">Parent</th><th className="font-semibold">Match rules</th><th />
               </tr></thead>

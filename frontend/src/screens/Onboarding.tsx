@@ -1,16 +1,19 @@
-import { FileUp, FlaskConical, Rocket, ShieldCheck } from "lucide-react";
+import { FileUp, FlaskConical, Rocket } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardBody, CardHeader, IconTile } from "@/components/ui/card";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { api } from "@/lib/api";
 import { ThemeToggle } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
+type Mode = "demo" | "connect" | "import";
+
+/** Start window: pick how to open a project, like the project dialog of a desktop scanner. */
 export function Onboarding({ onCreated, onCancel, notify }: {
   onCreated: (id: string) => Promise<void>; onCancel?: () => void; notify: (m: string, k?: "ok" | "bad") => void;
 }) {
+  const [mode, setMode] = useState<Mode>("demo");
   const [name, setName] = useState("My API");
   const [baseUrl, setBaseUrl] = useState("http://127.0.0.1:8000");
   const [hosts, setHosts] = useState("");
@@ -25,93 +28,95 @@ export function Onboarding({ onCreated, onCancel, notify }: {
     setBusy(false);
   };
 
+  const options: { id: Mode; title: string; hint: string }[] = [
+    { id: "demo", title: "Demo project", hint: "Intentionally vulnerable API with users, orders and an admin area" },
+    { id: "connect", title: "Connect your API", hint: "Base URL and an explicit host allow-list" },
+    { id: "import", title: "Import authscope.yaml", hint: "An existing config; secrets are never part of it" },
+  ];
+
   return (
-    <div className="min-h-full">
-      <header className="sticky top-0 z-40 border-b border-line/60 bg-bg/75 backdrop-blur-xl">
-        <div className="mx-auto flex h-[68px] max-w-5xl items-center justify-between px-6">
-          <Logo />
-          <ThemeToggle />
-        </div>
+    <div className="flex min-h-screen flex-col">
+      <header className="flex h-9 items-center justify-between border-b border-line bg-chrome px-3">
+        <Logo />
+        <ThemeToggle />
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-12 px-6 py-12">
-        <section className="max-w-2xl">
-          <Badge tone="accent" className="mb-4">API authorization testing</Badge>
-          <h1 className="font-display text-5xl font-semibold leading-[1.02] tracking-[-0.035em] md:text-6xl">
-            Who can <span className="text-accent">really</span> reach what?
-          </h1>
-          <p className="mt-5 text-[15px] leading-relaxed text-mute">
-            AuthScope finds BOLA/IDOR, BFLA and BOPLA by comparing what your API actually returns with the access policy
-            you expect, and hands you reproducible evidence for every violation.
-          </p>
-        </section>
-
-        <div className="grid gap-6 lg:grid-cols-12">
-          <Card tone="inverse" className="p-8 lg:col-span-7">
-            <div className="absolute -right-16 -top-16 size-60 rounded-full bg-accent/25 blur-3xl" />
-            <div className="relative flex items-start gap-5">
-              <IconTile className="size-14 bg-accent-solid text-white"><Rocket className="size-6" /></IconTile>
-              <div>
-                <h2 className="font-display text-3xl font-bold tracking-tight">Try the demo API</h2>
-                <p className="mt-1 text-sm opacity-75">Intentionally vulnerable. Start it with <code className="font-mono">python -m demo_api</code>.</p>
-              </div>
-            </div>
-            <div className="relative mt-8 flex flex-col gap-3 sm:flex-row sm:items-end">
-              <label className="block flex-1">
-                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">Demo API address</span>
-                <input value={demoUrl} onChange={(e) => setDemoUrl(e.target.value)}
-                  className="h-10 w-full rounded-[3px] border border-white/15 bg-white/10 px-3 font-mono text-sm text-on-inverse focus:border-[#3fbf75] focus:outline-none" />
-              </label>
-              <Button variant="accent" disabled={busy} onClick={() => run(() => api.createDemo(demoUrl))}><Rocket className="size-4" /> Load demo project</Button>
-            </div>
-          </Card>
-
-          <div className="space-y-4 lg:col-span-5">
-            {[
-              ["Read-only by default", "Writes need an explicit switch and a reset endpoint."],
-              ["Explicit host allow-list", "One validated address per request; nothing else is contacted."],
-              ["Secrets stay out", "Tokens never reach the config, the database or reports."],
-            ].map(([t, d]) => (
-              <div key={t} className="flex items-start gap-4 rounded-2xl bg-panel2 p-5">
-                <IconTile className="size-10"><ShieldCheck className="size-4" /></IconTile>
-                <div><div className="font-display font-bold">{t}</div><div className="mt-0.5 text-sm text-mute">{d}</div></div>
-              </div>
-            ))}
+      <main className="flex flex-1 items-start justify-center px-4 py-14">
+        <div className="w-full max-w-[860px] border border-line bg-panel">
+          <div className="border-b border-line bg-panel2/60 px-4 py-2.5">
+            <h1 className="text-[14px] font-semibold">Open a project</h1>
+            <p className="text-xs text-mute">
+              AuthScope finds BOLA/IDOR, BFLA and BOPLA by comparing what your API actually returns with the access policy
+              you expect, and keeps reproducible evidence for every violation.
+            </p>
           </div>
-        </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader title="Connect your API" hint="Test only systems you are authorized to test. Requests go only to the hosts you list." />
-            <CardBody className="grid grid-cols-2 gap-4">
-              <Field label="Project name"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-              <Field label="Base URL"><Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://127.0.0.1:8000" /></Field>
-              <Field label="Allowed hosts" hint="Comma separated. Required unless the target is localhost." className="col-span-2">
-                <Input value={hosts} onChange={(e) => setHosts(e.target.value)} placeholder="api.staging.example.com" />
-              </Field>
-              <div className="col-span-2">
-                <Button disabled={busy} onClick={() => run(() => api.createProject({
-                  name, target: { base_url: baseUrl, allowed_hosts: hosts.split(",").map((h) => h.trim()).filter(Boolean) },
-                }))}><FlaskConical className="size-4" /> Create project</Button>
-              </div>
-            </CardBody>
-          </Card>
+          <div className="grid md:grid-cols-[260px_minmax(0,1fr)]">
+            <ul className="border-b border-line md:border-b-0 md:border-r">
+              {options.map((o) => (
+                <li key={o.id}>
+                  <button onClick={() => setMode(o.id)}
+                    className={cn("block w-full cursor-pointer border-b border-line2 px-4 py-2.5 text-left", mode === o.id ? "bg-sel" : "hover:bg-panel2/70")}>
+                    <div className="text-[12.5px] font-medium">{o.title}</div>
+                    <div className="text-xs text-mute">{o.hint}</div>
+                  </button>
+                </li>
+              ))}
+              <li className="space-y-1 px-4 py-3 text-xs text-mute">
+                <div>Read-only by default</div>
+                <div>One validated host per request</div>
+                <div>Tokens never reach config, database or reports</div>
+              </li>
+            </ul>
 
-          <Card>
-            <CardHeader title="Import an existing config" hint="authscope.yaml - secrets are never part of it; tokens come from env vars or the UI." />
-            <CardBody className="space-y-3">
-              <Textarea rows={5} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder={"target:\n  base_url: http://127.0.0.1:8000\nidentities: [alice, bob, admin]"} />
-              <div className="flex gap-2">
-                <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-[3px] bg-panel2 px-4 text-sm font-semibold hover:bg-high">
-                  <FileUp className="size-4" /> Choose file
-                  <input type="file" accept=".yaml,.yml" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) setYaml(await f.text()); }} />
-                </label>
-                <Button variant="outline" disabled={busy || !yaml.trim()} onClick={() => run(() => api.importYaml(yaml))}>Import</Button>
-              </div>
-            </CardBody>
-          </Card>
+            <div className="p-4">
+              {mode === "demo" && (
+                <div className="space-y-3">
+                  <p className="text-[12.5px]">Start the demo API with <code className="bg-bg px-1 font-mono text-[12px]">python -m demo_api</code>, then load the project.</p>
+                  <div className="flex items-end gap-2">
+                    <label className="block flex-1">
+                      <span className="mb-1 block text-xs text-mute">Demo API address</span>
+                      <input value={demoUrl} onChange={(e) => setDemoUrl(e.target.value)}
+                        className="h-8 w-full border border-line bg-bg px-2.5 font-mono text-[12.5px] text-ink focus:border-accent focus:outline-none" />
+                    </label>
+                    <Button disabled={busy} onClick={() => run(() => api.createDemo(demoUrl))}><Rocket className="size-3.5" /> Load demo project</Button>
+                  </div>
+                </div>
+              )}
+
+              {mode === "connect" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <p className="col-span-2 text-xs text-mute">Test only systems you are authorized to test. Requests go only to the hosts you list.</p>
+                  <Field label="Project name"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+                  <Field label="Base URL"><Input className="font-mono" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://127.0.0.1:8000" /></Field>
+                  <Field label="Allowed hosts" hint="Comma separated. Required unless the target is localhost." className="col-span-2">
+                    <Input className="font-mono" value={hosts} onChange={(e) => setHosts(e.target.value)} placeholder="api.staging.example.com" />
+                  </Field>
+                  <div className="col-span-2">
+                    <Button disabled={busy} onClick={() => run(() => api.createProject({
+                      name, target: { base_url: baseUrl, allowed_hosts: hosts.split(",").map((h) => h.trim()).filter(Boolean) },
+                    }))}><FlaskConical className="size-3.5" /> Create project</Button>
+                  </div>
+                </div>
+              )}
+
+              {mode === "import" && (
+                <div className="space-y-2">
+                  <p className="text-xs text-mute">Tokens come from environment variables or the UI, never from the file.</p>
+                  <Textarea rows={8} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder={"target:\n  base_url: http://127.0.0.1:8000\nidentities: [alice, bob, admin]"} />
+                  <div className="flex gap-2">
+                    <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 border border-line bg-panel px-3 text-[12.5px] font-medium hover:border-dim">
+                      <FileUp className="size-3.5" /> Choose file
+                      <input type="file" accept=".yaml,.yml" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) setYaml(await f.text()); }} />
+                    </label>
+                    <Button variant="secondary" disabled={busy || !yaml.trim()} onClick={() => run(() => api.importYaml(yaml))}>Import</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          {onCancel && <div className="border-t border-line px-4 py-2 text-right"><Button variant="ghost" size="sm" onClick={onCancel}>Back to current project</Button></div>}
         </div>
-        {onCancel && <div className="text-center"><Button variant="ghost" onClick={onCancel}>Back to current project</Button></div>}
       </main>
     </div>
   );

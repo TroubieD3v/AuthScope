@@ -120,7 +120,7 @@ def main() -> None:
         row.scroll_into_view_if_needed()
         row.click()
         page.get_by_text("Expected policy", exact=True).wait_for()
-        row.evaluate("e => { e.closest('button').scrollIntoView({block: 'start'}); window.scrollBy(0, -84); }")
+        page.evaluate("window.scrollTo(0, 0)")  # results table, both editors and the inspector in one frame
         time.sleep(0.3)
         frame(page, frames, 10)
         settle(page)
