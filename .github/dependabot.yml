@@ -3,6 +3,8 @@ version: 2
 updates:
   - package-ecosystem: pip
     directory: /
+    # pyproject.toml holds ranges for people installing the package: only move a floor when a release falls outside it.
+    versioning-strategy: increase-if-necessary
     schedule: { interval: weekly }
     groups:
       python:
