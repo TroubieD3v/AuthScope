@@ -4,18 +4,18 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
       - run: pip install -e ".[dev]"
       - run: pytest -q
   ui:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
       - run: npm ci && npm run build
         working-directory: frontend
@@ -24,7 +24,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker compose build
   # Authorization gate: AuthScope must be right on both sides - silent on the secure demo, and finding exactly the
   # planted BOLA/BFLA/BOPLA/unauthenticated/cross-tenant flaws on the vulnerable one, with matching evidence and no
@@ -32,8 +32,8 @@ jobs:
   authz-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
       - run: pip install -e .
       - name: Start secure and flawed instances of both test stands
@@ -49,6 +49,6 @@ jobs:
         run: python scripts/ci_gate.py --stand demo --secure http://127.0.0.1:8000 --vulnerable http://127.0.0.1:8001 --out authz-reports
       - name: Gate - independent ledger stand
         run: python scripts/ci_gate.py --stand ledger --secure http://127.0.0.1:8100 --vulnerable http://127.0.0.1:8101 --out authz-reports
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with: { name: authz-reports, path: authz-reports }
